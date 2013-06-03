@@ -46,7 +46,7 @@ sub getPetData {
     var myPet = new mathPet($points,"$url");
     myPet.initiate();
 EOS
-	;
+    ;
 	
     return $script;
 

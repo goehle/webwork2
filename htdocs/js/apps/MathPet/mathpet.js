@@ -7,9 +7,10 @@ function mathPet(score,imgurl)
     this.mintop = this.petdiv.offset().top;
     this.maxleft = this.petdiv.width()+ this.minleft;
     this.maxtop = this.petdiv.height() + this.mintop;
+    var self = this;
+
 
     // This is needed so that the same object is used across setInterval calls
-    var self = this;
     function callAnimate() {
 	self.animate();
     }
@@ -21,24 +22,54 @@ function mathPet(score,imgurl)
 
 	this.pet.height('50px');
 	this.maxleft -= this.pet.width();
-	this.maxtop += this.pet.height();
+	this.maxtop -= this.pet.height();
+	this.minleft += this.pet.width();
+	this.mintop += this.pet.height();
 
 	this.petleft = (this.maxleft+3*this.minleft)/4;
 	this.pettop = (this.maxtop+3*this.mintop)/4;
 	this.pethomeleft = this.petleft;
 	this.pethometop = this.pettop;
-
-	this.pet.offset({'left':this.petleft,'top':this.pettop});
-	this.pet.animate({'opacity':1},1500);
 	
+	if ($("#achievementModal:contains('Level Up')").length > 0) {
+                             
+	    var temppetleft = $(window).width()/2;
+	    var temppettop = $(window).height()/2;
+
+	    $('#achievementModal').on('hidden', function () {
+		self.pet.offset({'left':temppetleft,'top':temppettop});
+		self.pet.animate({'opacity':1},1500);
+		self.pet.animate({'height':'100px'},2000);
+		self.pet.animate({'left':self.petleft,'top':self.pettop},3000);
+	    });
+	} else {
+
+	    this.pet.offset({'left':this.petleft,'top':this.pettop});
+	    this.pet.animate({'opacity':1},1500);
+	}
+
 	//Get things started then go into a loop
 	this.animate();
-	window.setInterval(callAnimate, 10000);
 
     }
 
     this.animate = function() {
-	this.wander();
+	if ($('#achievementModal').length > 0) {
+	    
+	    this.dance();
+	    
+	} else {
+
+	    this.wander();
+
+	}
+	
+	setTimeout(callAnimate,1000);
+    }
+
+    this.dance = function() {
+	this.pet.rotate({angle:0,animateTo:360});
+
     }
 
     this.wander = function() {

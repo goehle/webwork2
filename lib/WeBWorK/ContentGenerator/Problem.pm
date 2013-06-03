@@ -42,6 +42,7 @@ use URI::Escape;
 use WeBWorK::Localize;
 use WeBWorK::Utils::Tasks qw(fake_set fake_problem);
 use WeBWorK::AchievementEvaluator;
+use WeBWorK::MathPet;
 
 ################################################################################
 # CGI param interface to this module (up-to-date as of v1.153)
@@ -1674,6 +1675,20 @@ sub output_JS{
 	print CGI::start_script({type=>"text/javascript", src=>"$site_url/js/apps/Problem/problem.js"}), CGI::end_script();
 	
 	return "";
+}
+
+sub output_math_pet {
+    my $self = shift;
+    my $r = $self->r;
+    my $ce = $r->ce;
+    my $db = $r->db;
+    my $user = $r->param('user');
+
+    if ($ce->{mathPetEnabled}) {
+ 	print CGI::script({type=>"text/javascript"},WeBWorK::MathPet::getPetData($user,$ce,$db));
+    }
+
+    return "";
 }
 
 sub output_achievement_CSS {

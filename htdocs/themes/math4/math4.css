@@ -798,3 +798,11 @@ table#grades_table pre{
     font-size:small;
 }
 
+#math-pet {
+    height:20em;
+}
+
+#math-pet-img {
+    position:absolute;
+    opacity:0;
+}

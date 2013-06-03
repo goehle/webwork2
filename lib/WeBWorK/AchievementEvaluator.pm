@@ -26,6 +26,7 @@ use strict;
 use warnings;
 use WeBWorK::CGI;
 use WeBWorK::Utils qw(before after readFile sortAchievements);
+use WeBWorK::MathPet;
 
 use Safe;
 use Storable qw(nfreeze thaw);
@@ -233,7 +234,14 @@ sub checkForAchievements {
 	$db->putUserAchievement($userAchievement);
 	
     }  #end for loop
-    
+
+    #update the MathPet, if necessary
+    if ($ce->{mathPetEnabled}) {
+	#This provides the update function with a reference to globalData, 
+	# and it will make whatever pet-centric changes there are necessary
+	WeBWorK::MathPet::updatePet($user_id,$ce,$db,$globalData);
+    }
+
     #nfreeze globalData and store
     $globalUserAchievement->frozen_hash(nfreeze($globalData));
     $db->putGlobalUserAchievement($globalUserAchievement);

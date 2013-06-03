@@ -28,6 +28,7 @@
 <script type="text/javascript", src="<!--#url type="webwork" name="htdocs"-->/js/vendor/jquery/jquery.js"></script>
 <script type="text/javascript", src="<!--#url type="webwork" name="htdocs"-->/js/vendor/bootstrap/js/bootstrap.js"></script>
 <script type="text/javascript", src="<!--#url type="webwork" name="htdocs"-->/themes/math4/math4.js"></script>	
+<script type="text/javascript", src="<!--#url type="webwork" name="htdocs"-->/js/apps/MathPet/mathpet.js"></script>	
 
 <!--#if can="output_achievement_CSS"-->
 <link rel="stylesheet" type="text/css" href="<!--#url type="webwork" name="htdocs"-->/themes/math4/achievements.css"/>
@@ -245,11 +246,17 @@ var tabberOptions = {manualStartup:true};
 </div>
 <!--#endif-->
 		
-</div><!--content-->
+<!--#if can="output_math_pet"-->
+<div class="row-fluid"><div id="math-pet" class="span8">
+	<!--#output_math_pet-->
+</div><div class="span4"></div></div>
+<!--#end-->
 
+</div><!--content-->
 
 <!-- Bootstrap Fluid Layout Scaffolding stop -->
 </div> <!-- row-fluid -->
+
 </div> <!-- container-fluid -->
 
 

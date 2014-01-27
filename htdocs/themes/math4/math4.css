@@ -692,7 +692,7 @@ table caption{
 	margin-top: 10%;
 	margin-left: 10%;
 	margin-right: 10%;
-}*/
+}
 
 #editor{
 	width: 585px;
@@ -872,7 +872,6 @@ table#grades_table pre{
     font-size:small;
 }
 
-<<<<<<< HEAD
 #math-pet {
     height:20em;
 }
@@ -880,7 +879,8 @@ table#grades_table pre{
 #math-pet-img {
     position:absolute;
     opacity:0;
-=======
+}
+
 /* Equation editor bugfixes */
 #eqEditorDiv {
     overflow:visible;
@@ -889,5 +889,4 @@ table#grades_table pre{
 #openEqEditor {
     min-height:35px;
     min-width:43px;
->>>>>>> 91058ed47da7aa14ba00101634704e7dede01d1f
 }

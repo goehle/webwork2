@@ -40,7 +40,7 @@ sub getPetData {
     }
 
     my $points = $globalUserAchievement->achievement_points;
-    my $url = $ce->{webworkURLs}->{htdocs}.'/js/apps/MathPet/img/cat.gif';
+    my $url = $ce->{webworkURLs}->{htdocs}.'/js/apps/MathPet/img/sprite_derpy.gif';
 
     my $script = <<EOS;     
     var myPet = new mathPet($points,"$url");

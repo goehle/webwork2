@@ -75,11 +75,11 @@ tag_widget.prototype.tw_gettags = function(path, id) {
     return false;
   }
   mydefaultRequestObject.command = path;
-  console.log(mydefaultRequestObject);
+  // console.log(mydefaultRequestObject);
   return $.post(basicWebserviceURL, mydefaultRequestObject, function (data) {
       var response = $.parseJSON(data);
       var dat = response.result_data;
-      console.log(dat);
+      // console.log(dat);
       tag_widget_update('subjects', 'get', id, dat);
     });
   return true;
@@ -102,13 +102,13 @@ tag_widget_savetags = function(id, path) {
   mydefaultRequestObject.library_subjects = subj;
   mydefaultRequestObject.library_chapters = chap;
   mydefaultRequestObject.library_sections = sect;
-  mydefaultRequestObject.library_level = level;
+  mydefaultRequestObject.library_levels = level;
   mydefaultRequestObject.command = path;
-  console.log(mydefaultRequestObject);
+  // console.log(mydefaultRequestObject);
   return $.post(basicWebserviceURL, mydefaultRequestObject, function (data) {
       var response = $.parseJSON(data);
       var mesg = response.server_response;
-      console.log(response);
+      // console.log(response);
       $('#'+id+'result').text(mesg);
     });
 }

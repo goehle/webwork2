@@ -3,6 +3,8 @@
 <head>
 <meta charset='utf-8'>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- This encourages IE to *not* use compatibility view, which breaks math4 -->
+<meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
 
 <!--
 ################################################################################
@@ -28,8 +30,14 @@
 <link rel="stylesheet" type="text/css" href="<!--#url type="webwork" name="htdocs"-->/css/vendor/font-awesome/css/font-awesome.min.css"/>
 <link rel="stylesheet" type="text/css" href="<!--#url type="webwork" name="htdocs"-->/themes/math4/math4.css"/>
 <script type="text/javascript" src="<!--#url type="webwork" name="htdocs"-->/js/vendor/jquery/jquery.js"></script>
+
+<script type="text/javascript" src="<!--#url type="webwork" name="MathJax"-->"></script>
+<!--#if can="output_jquery_ui"-->
+	<link rel="stylesheet" type="text/css" href="<!--#url type="webwork" name="htdocs"-->/css/jquery-ui-1.8.18.custom.css"/>
+	<script type="text/javascript" src="<!--#url type="webwork" name="htdocs"-->/js/jquery-ui-1.9.0.js"></script>
+<!--#endif-->
+
 <script type="text/javascript" src="<!--#url type="webwork" name="htdocs"-->/js/vendor/bootstrap/js/bootstrap.js"></script>
-<script type="text/javascript" src="<!--#url type="webwork" name="htdocs"-->/themes/math4/math4.js"></script>	
 
 <!-- Math pets scripts -->
 <script type="text/javascript", src="<!--#url type="webwork" name="htdocs"-->/js/apps/MathPet/jQueryRotate.js"></script>	
@@ -45,16 +53,18 @@ var tabberOptions = {manualStartup:true};
 </script>
 	<link rel="stylesheet" type="text/css" href="<!--#url type="webwork" name="htdocs"-->/css/tabber.css"/>
 <!--#endif-->
-<!--#if can="output_jquery_ui_CSS"-->
-	<link rel="stylesheet" type="text/css" href="<!--#url type="webwork" name="htdocs"-->/css/jquery-ui-1.8.18.custom.css"/>
-<!--#endif-->
+
 <!--#if can="output_JS"-->
 	<!--#output_JS-->
 <!--#endif-->
 
+
 <title><!--#path style="text" text=" : " textonly="1"--></title>
+
+
 <!--#head-->
 </head>
+
 <body>
 <!--#if can="output_wztooltip_JS"--> <!-- Please remind this -->
 	<!--#output_wztooltip_JS-->
@@ -63,7 +73,7 @@ var tabberOptions = {manualStartup:true};
 <!-- Bootstrap Fluid Layout Scaffolding start -->
 <div class="container-fluid">
 <!-- Header -->
-<div id = "masthead" class="row-fluid">
+<div id = "masthead" class="row-fluid" role="banner">
 	<div class="span2 webwork_logo">
 		<a href="<!--#url type="webwork" name="root"-->"><img src="<!--#url type="webwork" name="htdocs"-->/images/webwork_transparent_logo_small.png" alt="image link to MAA (Mathematical Association of America) main web site" />WeBWorK</a>
 	</div>
@@ -78,7 +88,7 @@ var tabberOptions = {manualStartup:true};
 <div class="row-fluid">
 
 <!-- Navigation -->
-<div id="site-navigation" class="span2 hidden-phone">
+<div id="site-navigation" class="span2 hidden-phone" role="navigation" aria-label="main navigation">
   <!--#if can="links"-->
         <div id="site-links">
 	  <!--#links-->
@@ -101,21 +111,23 @@ var tabberOptions = {manualStartup:true};
 <div id="content" class="span10" >
 	<!-- Breadcrumb -->
 	<div class="row-fluid"><div class="span12">
+	<div role="navigation" aria-label="breadcrumb navigation">
 	<ul class="breadcrumb">
 		<!--#path style="bootstrap" text="<li><span class='divider'>/</span></li>"-->
 	</ul>
+	</div>
 	</div></div>
 
 	<!-- Page Title -->
 	<!--#if can="title"-->
 	<div class="row-fluid"><div class="span12">
-		<h2 class='page-title'><!--#title --></h2>
+		<h1 class='page-title'><!--#title --></h1>
 	</div></div>
 	<!--#endif-->
 
 	<!--#if can="nav" can="message"--> 
 	<div class="row-fluid">
-	  <div class="problem-nav span3">
+	  <div class="problem-nav span3" role="navigation" aria-label="question navigation">
 	<!-- Question Navigation, e.g.: Prev, Up, Next for homeworks -->
 	<!--#if can="nav"-->
 		<!--#nav style="buttons" imageprefix="/webwork2_files/images/nav" imagesuffix=".gif" separator="  "-->
@@ -183,14 +195,14 @@ var tabberOptions = {manualStartup:true};
 				
 
 
-			<!--#if can="output_hidden_info"-->
-				<!--#output_hidden_info-->
-			<!--#endif-->
 
 			<!--#if can="output_form_start"-->
 			<div class="row-fluid">
 			  <div class="span10">
 				<!--#output_form_start-->
+			    <!--#if can="output_hidden_info"-->
+				     <!--#output_hidden_info-->
+			    <!--#endif-->
 
 				<!--#if can="output_problem_body" can="output_message" can="output_editorLink"-->
 					<div class="problem">
@@ -301,9 +313,11 @@ var tabberOptions = {manualStartup:true};
 
 
 <!-- Footer -->
-<div id="footer">
+<div id="footer" role="contentinfo">
 	<!--#footer-->
 </div>
+
+<script type="text/javascript" src="<!--#url type="webwork" name="htdocs"-->/themes/math4/math4.js"></script>	
 
 </body>
 </html>

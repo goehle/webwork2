@@ -92,12 +92,12 @@ use constant DEFAULT_VISIBILITY_STATE => 1;
 use constant DEFAULT_ENABLED_REDUCED_SCORING_STATE => 0;
 use constant ONE_WEEK => 60*60*24*7;  
 
-use constant EDIT_FORMS => [qw(cancelEdit saveEdit)];
+use constant EDIT_FORMS => [qw(saveEdit cancelEdit)];
 use constant VIEW_FORMS => [qw(filter sort edit publish import export score create delete)];
-use constant EXPORT_FORMS => [qw(cancelExport saveExport)];
+use constant EXPORT_FORMS => [qw(saveExport cancelExport)];
 
-use constant VIEW_FIELD_ORDER => [ qw( set_id problems users visible enable_reduced_scoring open_date due_date answer_date) ];
-use constant EDIT_FIELD_ORDER => [ qw( set_id visible enable_reduced_scoring open_date due_date answer_date) ];
+use constant VIEW_FIELD_ORDER => [ qw( set_id problems users visible hide_hint enable_reduced_scoring open_date due_date answer_date) ];
+use constant EDIT_FIELD_ORDER => [ qw( set_id visible hide_hint enable_reduced_scoring open_date due_date answer_date) ];
 use constant EXPORT_FIELD_ORDER => [ qw( select set_id filename) ];
 
 # permissions needed to perform a given action
@@ -243,6 +243,11 @@ use constant  FIELD_PROPERTIES => {
 		type => "text",
 		size => 10,
 		access => "readwrite",
+	},
+	hide_hint => {
+		type => "checked",
+		size => 4,
+		access => "readwrite",
 	}
 };
 
@@ -387,7 +392,7 @@ sub initialize {
 			}
 			my %actionParams = $self->getActionParams($actionID);
 			my %tableParams = $self->getTableParams();
-			$self->addmessage(CGI::div({class=>"Message"}, $r->maketext("Results of last action performed").": "));
+			$self->addmessage(CGI::div($r->maketext("Results of last action performed").": "));
 			$self->addmessage($self->$actionHandler(\%genericParams, \%actionParams, \%tableParams));
 		} else {
 			return CGI::div({class=>"ResultsWithError"}, CGI::p($r->maketext("You are not authorized to perform this action.")));
@@ -437,7 +442,8 @@ sub body {
 		due_date
 		answer_date
 		visible
-		enable_reduced_scoring	
+		enable_reduced_scoring
+		hide_hint
 	)} = (
 		$r->maketext("Edit Problems"),
 		$r->maketext("Edit Assigned Users"),
@@ -449,7 +455,11 @@ sub body {
 		$r->maketext("Due Date"), 
 		$r->maketext("Answer Date"), 
 		$r->maketext("Visible"),
-		$r->maketext("Reduced Credit Enabled") 
+	    # Reduced Credit Enabled made the column wider than it needed
+	    # to be...
+	    #   $r->maketext("Reduced Credit Enabled"), 
+	        $r->maketext("Reduced Credit"), 
+		$r->maketext("Hide Hints") 
 	);
 	
 
@@ -719,24 +729,30 @@ sub filter_handler {
 		$result = $r->maketext("showing selected sets");
 		$self->{visibleSetIDs} = $genericParams->{selected_sets}; # an arrayref
 	} elsif ($scope eq "match_ids") {
+                $result = $r->maketext("showing matching sets");
 		#my @setIDs = split /\s*,\s*/, $actionParams->{"action.filter.set_ids"}->[0];
 		my @setIDs = split /\s*,\s*/, $actionParams->{"action.filter.set_ids"}->[0];
 		$self->{visibleSetIDs} = \@setIDs;
 	} elsif ($scope eq "match_open_date") {
+                $result = $r->maketext("showing matching sets");
 		my $open_date = $actionParams->{"action.filter.open_date"}->[0];
 		$self->{visibleSetIDs} = $self->{open_dates}->{$open_date}; # an arrayref
 	} elsif ($scope eq "match_due_date") {
+                $result = $r->maketext("showing matching sets");
 		my $due_date = $actionParams->{"action.filter.due_date"}->[0];
 		$self->{visibleSetIDs} = $self->{due_date}->{$due_date}; # an arrayref
 	} elsif ($scope eq "match_answer_date") {
+                $result = $r->maketext("showing matching sets");
 		my $answer_date = $actionParams->{"action.filter.answer_date"}->[0];
 		$self->{visibleSetIDs} = $self->{answer_dates}->{$answer_date}; # an arrayref
 	} elsif ($scope eq "visible") {
+                $result = $r->maketext("showing visible sets");
 		# DBFIXME do filtering in the database, please!
 		my @setRecords = $db->getGlobalSets(@{$self->{allSetIDs}});
 		my @visibleSetIDs = map { $_->visible ? $_->set_id : ""} @setRecords;		
 		$self->{visibleSetIDs} = \@visibleSetIDs;
 	} elsif ($scope eq "unvisible") {
+                $result = $r->maketext("showing hidden sets");
 		# DBFIXME do filtering in the database, please!
 		my @setRecords = $db->getGlobalSets(@{$self->{allSetIDs}});
 		my @unvisibleSetIDs = map { (not $_->visible) ? $_->set_id : ""} @setRecords;
@@ -1257,6 +1273,8 @@ sub import_form {
 	my $r = $self->r;
 	my $authz = $r->authz;
 	my $user = $r->param('user');
+	my $ce = $r->ce;
+	my $display_tz = substr($self->formatDateTime(time), -3); 
 
 	# this will make the popup menu alternate between a single selection and a multiple selection menu
 	# Note: search by name is required since document.problemsetlist.action.import.number is not seen as
@@ -1267,7 +1285,18 @@ sub import_form {
 				"document.getElementsByName('action.import.source')[0].multiple = (number > 1 ? true : false);",
 				"document.getElementsByName('action.import.name')[0].value = (number > 1 ? '(taken from filenames)' : '');",
 			);
-	
+	my $datescript = <<EOS;
+\$('#import_date_shift').datetimepicker({
+  showOn: "button",
+  buttonText: "<i class='icon-calendar'></i>",
+  ampm: true,
+  timeFormat: 'hh:mmtt',
+  timeSuffix: ' $display_tz',
+  separator: ' at ',
+  constrainInput: false, 
+ });
+EOS
+
 	return join(" ",
 		WeBWorK::CGI_labeled_input(
 			-type=>"select",
@@ -1311,6 +1340,15 @@ sub import_form {
 				-onchange => $onChange,
 			}
 		),
+		    CGI::br(),
+		    CGI::div(WeBWorK::CGI_labeled_input(
+		      -type=>"text",
+		      -id=>"import_date_shift",
+		      -label_text=>$r->maketext("Shift dates so that the earliest is").": ",
+		      -input_attr=>{
+			  -name => "action.import.start.date",
+			  -size => "27",
+			  -onchange => $onChange,})),
 		CGI::br(),
 		($authz->hasPermissions($user, "assign_problem_sets")) 
 			?
@@ -1330,7 +1368,9 @@ sub import_form {
 				}
 			)
 			:
-			""	#user does not have permissions to assign problem sets
+			"",	#user does not have permissions to assign problem sets
+		    CGI::script({-type=>"text/javascript"},$datescript),
+
 	);
 }
 
@@ -1342,8 +1382,12 @@ sub import_handler {
 	my $newSetName = $actionParams->{"action.import.name"}->[0];
 	$newSetName = "" if $actionParams->{"action.import.number"}->[0] > 1; # cannot assign set names to multiple imports
 	my $assign = $actionParams->{"action.import.assign"}->[0];
-	
-	my ($added, $skipped) = $self->importSetsFromDef($newSetName, $assign, @fileNames);
+	my $startdate = 0;
+	if ($actionParams->{"action.import.start.date"}->[0]) {
+	    $startdate = $self->parseDateTime($actionParams->{"action.import.start.date"}->[0]);
+	}
+
+	my ($added, $skipped) = $self->importSetsFromDef($newSetName, $assign, $startdate, @fileNames);
 
 	# make new sets visible... do we really want to do this? probably.
 	push @{ $self->{visibleSetIDs} }, @$added;
@@ -1550,7 +1594,7 @@ sub saveEdit_handler {
 	
 	$self->{editMode} = 0;
 	
-	return CGI::div({class=>"ResultsWithError"}, $r->maketext("changes saved") );
+	return CGI::div({class=>"ResultsWithOutError"}, $r->maketext("changes saved") );
 }
 
 sub duplicate_form {
@@ -1665,11 +1709,12 @@ sub menuLabels {
 }
 
 sub importSetsFromDef {
-	my ($self, $newSetName, $assign, @setDefFiles) = @_;
+	my ($self, $newSetName, $assign, $startdate, @setDefFiles) = @_;
 	my $r     = $self->r;
 	my $ce    = $r->ce;
 	my $db    = $r->db;
 	my $dir   = $ce->{courseDirs}->{templates};
+	my $mindate = 0;
 
 	# if the user includes "following files" in a multiple selection
 	# it shows up here as "" which causes the importing to die
@@ -1698,7 +1743,7 @@ sub importSetsFromDef {
 
 		debug("$set_definition_file: reading set definition file");
 		# read data in set definition file
-		my ($setName, $paperHeaderFile, $screenHeaderFile, $openDate, $dueDate, $answerDate, $ra_problemData, $assignmentType, $attemptsPerVersion, $timeInterval, $versionsPerInterval, $versionTimeLimit, $problemRandOrder, $problemsPerPage, $hideScore, $hideWork,$timeCap,$restrictIP,$restrictLoc,$relaxRestrictIP) = $self->readSetDef($set_definition_file);
+		my ($setName, $paperHeaderFile, $screenHeaderFile, $openDate, $dueDate, $answerDate, $ra_problemData, $assignmentType, $attemptsPerVersion, $timeInterval, $versionsPerInterval, $versionTimeLimit, $problemRandOrder, $problemsPerPage, $hideScore, $hideWork,$timeCap,$restrictIP,$restrictLoc,$relaxRestrictIP,$description) = $self->readSetDef($set_definition_file);
 		my @problemList = @{$ra_problemData};
 
 		# Use the original name if form doesn't specify a new one.
@@ -1714,6 +1759,11 @@ sub importSetsFromDef {
 			push @added, $setName;
 		}
 
+		# keep track of which as the earliest answer date
+		if ($mindate > $openDate || $mindate == 0) {
+		    $mindate = $openDate;
+		}
+
 		debug("$set_definition_file: adding set");
 		# add the data to the set record
 		my $newSetRecord = $db->newGlobalSet;
@@ -1725,6 +1775,7 @@ sub importSetsFromDef {
 		$newSetRecord->answer_date($answerDate);
 		$newSetRecord->visible(DEFAULT_VISIBILITY_STATE);
 		$newSetRecord->enable_reduced_scoring(DEFAULT_ENABLED_REDUCED_SCORING_STATE);
+		$newSetRecord->description($description);
 
 	# gateway/version data.  these should are all initialized to ''
         #   by readSetDef, so for non-gateway/versioned sets they'll just 
@@ -1792,6 +1843,21 @@ sub importSetsFromDef {
 		}
 	}
 
+	#if there is a start date we have to reopen all of the sets that were added and shift the dates
+	if ($startdate) {
+	    #the shift for all of the dates is from the min date to the start date
+	    my $dateshift = $startdate - $mindate;
+	    
+	    foreach my $setID (@added) {
+		my $setRecord = $db->getGlobalSet($setID);
+		$setRecord->open_date($setRecord->open_date + $dateshift);
+		$setRecord->due_date($setRecord->due_date + $dateshift);
+		$setRecord->answer_date($setRecord->answer_date + $dateshift);
+		$db->putGlobalSet($setRecord);
+	    }
+	}
+
+
 	return \@added, \@skipped;
 }
 
@@ -1822,6 +1888,7 @@ sub readSetDef {
 	my ($line, $name, $value, $attemptLimit, $continueFlag);
 	my $paperHeaderFile = '';
 	my $screenHeaderFile = '';
+	my $description = '';
 	my ($dueDate, $openDate, $answerDate);
 	my @problemData;	
 
@@ -1893,7 +1960,10 @@ sub readSetDef {
 			} elsif ($item eq 'restrictLocation' ) { 
 				$restrictLoc = ( $value ) ? $value : '';
 			} elsif ( $item eq 'relaxRestrictIP' ) {
-				$relaxRestrictIP = ( $value ) ? $value : 'No';
+			    $relaxRestrictIP = ( $value ) ? $value : 'No';
+			} elsif ( $item eq 'description' ) {
+			    $value =~ s/<n>/\n/g;
+			    $description = $value;
 			} elsif ($item eq 'problemList') {
 				last;
 			} else {
@@ -1916,6 +1986,8 @@ sub readSetDef {
 	
                 #####################################################################
                 # Gateway/version variable cleanup: convert times into seconds
+		$assignmentType ||= 'default';
+
 		$timeInterval = WeBWorK::Utils::timeToSec( $timeInterval )
 		    if ( $timeInterval );
 		$versionTimeLimit = WeBWorK::Utils::timeToSec($versionTimeLimit)
@@ -2014,6 +2086,7 @@ sub readSetDef {
 		 $restrictIP,
 		 $restrictLoc,
 		 $relaxRestrictIP,
+		 $description
 		);
 	} else {
 		warn $r->maketext("Can't open file [_1]", $filePath)."\n";
@@ -2058,6 +2131,11 @@ SET:	foreach my $set (keys %filenames) {
 		my $openDate     = $self->formatDateTime($setRecord->open_date);
 		my $dueDate      = $self->formatDateTime($setRecord->due_date);
 		my $answerDate   = $self->formatDateTime($setRecord->answer_date);
+		my $description = $setRecord->description;
+		if ($description) {
+		    $description =~ s/\n/<n>/g;
+		}
+		
 		my $setHeader    = $setRecord->set_header;
 		my $paperHeader  = $setRecord->hardcopy_header;
 		my @problemList = $db->listGlobalProblems($set);
@@ -2131,6 +2209,7 @@ dueDate           = $dueDate
 answerDate        = $answerDate
 paperHeaderFile   = $paperHeader
 screenHeaderFile  = $setHeader$gwFields
+description       = $description
 ${restrictFields}problemList       = 
 $problemList
 EOF
@@ -2161,7 +2240,7 @@ EOF
 ################################################################################
 
 sub fieldEditHTML {
-	my ($self, $fieldName, $value, $properties, $dateTimeScripts) = @_;
+	my ($self, $fieldName, $value, $properties) = @_;
 	my $size = $properties->{size};
 	my $type = $properties->{type};
 	my $access = $properties->{access};
@@ -2184,23 +2263,19 @@ sub fieldEditHTML {
 			my @temp = split(/.open_date/, $fieldName);
 			$bareName = $temp[0];
 			$bareName =~ s/\./\\\\\./g;
-			#$content = WeBWorK::Utils::DatePickerScripts::open_date_script($bareName, $timezone);
 		}
 		elsif(index($fieldName, ".due_date") != -1){
 			my @temp = split(/.due_date/, $fieldName);
 			$bareName = $temp[0];
 			$bareName =~ s/\./\\\\\./g;
-			#$content = WeBWorK::Utils::DatePickerScripts::due_date_script($bareName, $timezone);
 		}
 		elsif(index($fieldName, ".answer_date") != -1){
 			my @temp = split(/.answer_date/, $fieldName);
 			$bareName = $temp[0];
 			$bareName =~ s/\./\\\\\./g;
-			#$content = WeBWorK::Utils::DatePickerScripts::answer_date_script($bareName, $timezone);
 		}
 		
-		#push @$dateTimeScripts, $content;
-		push @$dateTimeScripts, WeBWorK::Utils::DatePickerScripts::date_scripts($bareName,$timezone);
+
 		return $out;
 	}
 	
@@ -2262,7 +2337,9 @@ sub fieldEditHTML {
 	    return WeBWorK::CGI_labeled_input(
 		-type=>"checkbox",
 		-id=>$fieldName."_id",
-		-label_text=>ucfirst($fieldName),
+# The labeled checkboxes are making the table very wide. 
+		-label_text=>"",
+#		-label_text=>ucfirst($fieldName),
 		-input_attr=>\%attr
 		) . CGI::hidden(
 		-name => $fieldName,
@@ -2384,27 +2461,29 @@ sub recordEditHTML {
 	# make a hash out of this so we can test membership easily
 	my %nonkeyfields; @nonkeyfields{$Set->NONKEYFIELDS} = ();
 	
-	my @chooseDateTimeScripts = ();
-	
-	#push @chooseDateTimeScripts, "addOnLoadEvent(function() {";
-
 	# Set Fields
 	foreach my $field (@fieldsToShow) {
 		next unless exists $nonkeyfields{$field};
 		my $fieldName = "set." . $set_id . "." . $field,		
 		my $fieldValue = $Set->$field;
+		#print $field;
 		my %properties = %{ FIELD_PROPERTIES()->{$field} };
 		$properties{access} = "readonly" unless $editMode;
 		$fieldValue = $self->formatDateTime($fieldValue) if $field =~ /_date/;
 		$fieldValue =~ s/ /&nbsp;/g unless $editMode;
 		$fieldValue = ($fieldValue) ? $r->maketext("Yes") : $r->maketext("No") if $field =~ /visible/ and not $editMode;
 		$fieldValue = ($fieldValue) ? $r->maketext("Yes") : $r->maketext("No") if $field =~ /enable_reduced_scoring/ and not $editMode;
-		push @tableCells, CGI::font({class=>$visibleClass}, $self->fieldEditHTML($fieldName, $fieldValue, \%properties, \@chooseDateTimeScripts));
+		$fieldValue = ($fieldValue) ? $r->maketext("Yes") : $r->maketext("No") if $field =~ /hide_hint/ and not $editMode;
+		push @tableCells, CGI::font({class=>$visibleClass}, $self->fieldEditHTML($fieldName, $fieldValue, \%properties));
+
 		#$fakeRecord{$field} = CGI::font({class=>$visibleClass}, $self->fieldEditHTML($fieldName, $fieldValue, \%properties));
 	}
 		
 	my $out = CGI::Tr({}, CGI::td({}, \@tableCells));
-	my $scripts = CGI::start_script({-type=>"text/javascript"}).(join("", @chooseDateTimeScripts)).CGI::end_script();
+	my $scripts = '';
+	if ($ce->{options}->{useDateTimePicker}) {
+	    $scripts = CGI::start_script({-type=>"text/javascript"}).WeBWorK::Utils::DatePickerScripts::date_scripts($ce, $Set).CGI::end_script();
+	}
 
 	return $out.$scripts;
 }
@@ -2501,6 +2580,11 @@ sub printTableHTML {
 
 # outputs all of the Javascript required for this page
 
+#Tells template to output stylesheet and js for Jquery-UI
+sub output_jquery_ui{
+	return "";
+}
+
 sub output_JS{
 	my $self = shift;
 	my $r = $self->r;
@@ -2511,7 +2595,6 @@ sub output_JS{
     
     print "\n\n<!-- add to header ProblemSetList2.pm -->";
         
-	print qq!<link rel="stylesheet" type="text/css" href="$site_url/css/jquery-ui-1.8.18.custom.css"/>!,"\n";
 	print qq!<link rel="stylesheet" media="all" type="text/css" href="$site_url/css/vendor/jquery-ui-themes-1.10.3/themes/smoothness/jquery-ui.css">!,"\n";
 	print qq!<link rel="stylesheet" media="all" type="text/css" href="$site_url/css/jquery-ui-timepicker-addon.css">!,"\n";
 
@@ -2522,7 +2605,8 @@ sub output_JS{
     </style>!,"\n";
     
 	# print javaScript for dateTimePicker	
-	print CGI::start_script({type=>"text/javascript", src=>"$site_url/js/jquery-ui-1.9.0.js"}), CGI::end_script();
+	# jquery ui printed seperately
+
 	print CGI::start_script({type=>"text/javascript", src=>"$site_url/js/legacy/vendor/jquery-ui-timepicker-addon.js"}), CGI::end_script();
 	print CGI::start_script({type=>"text/javascript", src=>"$site_url/js/legacy/addOnLoadEvent.js"}), CGI::end_script();
 	print CGI::start_script({type=>"text/javascript", src=>"$site_url/js/legacy/vendor/tabber.js"}), CGI::end_script();
@@ -2536,11 +2620,6 @@ sub output_JS{
 
 # Just tells template to output the stylesheet for Tabber
 sub output_tabber_CSS{
-	return "";
-}
-
-#Tells template to output stylesheet for Jquery-UI
-sub output_jquery_ui_CSS{
 	return "";
 }
 

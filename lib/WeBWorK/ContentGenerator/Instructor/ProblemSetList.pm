@@ -383,7 +383,7 @@ sub initialize {
 			}
 			my %actionParams = $self->getActionParams($actionID);
 			my %tableParams = $self->getTableParams();
-			$self->addmessage( CGI::div({class=>"Message"}, "Results of last action performed: "));
+			$self->addmessage( CGI::div("Results of last action performed: "));
 			$self->addmessage(
 			                     $self->$actionHandler(\%genericParams, \%actionParams, \%tableParams), 
 			                     CGI::hr()
@@ -1846,6 +1846,8 @@ sub readSetDef {
 	
                 #####################################################################
                 # Gateway/version variable cleanup: convert times into seconds
+		$assignmentType ||= 'default';
+
 		$timeInterval = WeBWorK::Utils::timeToSec( $timeInterval )
 		    if ( $timeInterval );
 		$versionTimeLimit = WeBWorK::Utils::timeToSec($versionTimeLimit)
@@ -2184,7 +2186,7 @@ sub recordEditHTML {
 	my $exportMode = $options{exportMode};
 	my $setSelected = $options{setSelected};
 
-	my $visibleClass = $Set->visible ? "visible" : "hidden";
+	my $visibleClass = $Set->visible ? "font-visible" : "font-hidden";
 	my $enable_reduced_scoringClass = $Set->enable_reduced_scoring ? $r->maketext('Reduced Credit Enabled') : $r->maketext('Reduced Credit Disabled');
 
 	my $users = $db->countSetUsers($Set->set_id);

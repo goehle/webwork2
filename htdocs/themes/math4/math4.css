@@ -1,3 +1,5 @@
+
+
 /* WeBWorK Online Homework Delivery System
  * Copyright � 2000-2007 The WeBWorK Project, http://openwebwork.sf.net/
  * $CVSHeader: webwork2/conf/templates/math2/math2.css,v 1.1.2.1 2008/06/24 17:17:36 gage Exp $
@@ -12,10 +14,14 @@
  * FOR A PARTICULAR PURPOSE.  See either the GNU General Public License or the
  * Artistic License for more details.
  */
-
+ 
 /* Bootstrap overrides */
 .row-fluid [class*="span"] {
     min-height:0px;
+}
+
+input[type="checkbox"] {
+    margin-right:.25em;
 }
 
 /* Banner */
@@ -107,6 +113,11 @@ ul.nav li a:hover {
 	width: 72%;
 }
 
+h1.page-title {
+	font-size: 31.5px;
+	line-height: 35px;
+}
+
 h2.page-title {
 	border-bottom: 1px solid #ccc;
 }
@@ -128,6 +139,10 @@ h2.page-title {
 	clear: both;
 }
 
+.Warnings code {
+    	white-space: normal;
+}
+
 /* Question nav section */
 .problem-nav {
 	margin-bottom:1ex;
@@ -138,14 +153,9 @@ h2.page-title {
 /* Message section */
 
 .Message {
-	display: inline-block;
-	margin-bottom:1ex;
-}
-
-.Message div, .Message span {
-	background-color:#eee;
-	padding: 0.5em;
-}
+    display: inline-block;
+    margin-bottom:1ex;
+}   
 
 .font-visible   { font-weight: bold; }
 .font-hidden { font-style: italic; } 
@@ -170,6 +180,22 @@ ul.courses-list a:hover {
 	text-decoration: none;
 	background: #038;
 	color: white;
+}
+
+/* past answers page */
+.past-answer-table td {
+    white-space: nowrap;
+    min-width: 20px;
+}
+
+.past-answer-table .table-rule {
+    border-top: 3px solid #d5d5d5;
+    padding-top: 5px;
+}
+.past-answer-table .essay,
+.past-answer-table .comment {
+    min-width: 400px;
+    white-space: normal;
 }
 
 /* Classlist Editor */
@@ -324,6 +350,7 @@ table.FormLayout tr { vertical-align: top; }
 table.FormLayout th.LeftHeader { text-align: right; white-space: nowrap; }
 table.FormLayout tr.ButtonRow { text-align: left; }
 table.FormLayout tr.ButtonRowCenter { text-align: center; }
+table.FormLayout td { padding-right:10px }
 
 div.RenderSolo { background-color: #E0E0E0; color: black; }
 div.AuthorComment { background-color: #00E0E0; color: black; }
@@ -347,6 +374,7 @@ span.ResultsWithError { color: #FF9494; background-color: inherit; } /* error re
 span.ResultsAlert { color: #F60; background-color: inherit; } /* orange */
 span.correct { color: inherit; background-color: #8F8; } /* green */
 span.incorrect { color: #FF9494; background-color: inherit; } /* red */
+span.unattempted { color: inherit; background-color: #88ECFF;}
 input.correct   { color:inherit; background-color: #8F8; } /* green */
 input.incorrect { color:inherit; background-color: #FF9494; } /* red */
 
@@ -368,6 +396,7 @@ div.ScrollingRecordList select.ScrollingRecordList { width: 99%; }
 
 .viewOptions label {
     font-size:small;
+    display:block;
 }
 
 /* messages, attempt results, answer previews, etc. go in this DIV */
@@ -397,6 +426,10 @@ table.attemptResults th {
 	background-color: #DDDDDD;
 }
 
+.attemptResults .popover {
+    max-width: 100%;
+}
+
 /*styles for the instructor comment box */
 
 .answerComments {
@@ -409,6 +442,16 @@ table.attemptResults th {
     padding: 2px 5px 2px 5px;
     margin-bottom:1em;
     background-color: #E8E8E8;
+}
+
+/* Make hr a black line for problem render areas so that
+ * it can be used for fractions
+ */
+.RenderSolo hr,
+.problem-content hr {
+  margin-top: 5px;
+  margin-bottom: 5px;
+  border-top-color: rgb(22,22,22);
 }
 
 /* override above settings in tables used to display ans_array results */
@@ -672,7 +715,7 @@ table caption{
 
 #pg_editor_frame_id{
     width:95%;
-    height:390px;
+    height:590px;
     overflow:scroll;
 }
 
@@ -684,6 +727,7 @@ table caption{
 #render-modal .modal-body {
     height:95%;
     width:95%;
+    max-height:600px;
 }
 
 .radio_span, 
@@ -764,6 +808,7 @@ table#grades_table pre{
 #send-mail-form select,
 .set-list-form input,
 .set-list-form select,
+.set-list-form button,
 .user-list-form input,
 .user-list-form select {
     margin-top: .15em;
@@ -782,12 +827,16 @@ table#grades_table pre{
 #problem_set_form .btn {
     margin-left:.5ex;
     margin-right:.5ex;
-}
+} 
 
 #mainform .btn,
 #problem_set_form .btn {
     margin-bottom:.25ex;
     margin-top:.25ex;
+}
+
+#problem_set_form .ui-datepicker-trigger {
+    margin: 0;
 }
 
 #problem_set_form input[type="checkbox"] {
@@ -803,6 +852,13 @@ table#grades_table pre{
     width:60px;
 }
 
+#problem-grader-form .graded-answer,
+#problem-grader-form .essay-answer {
+    border-bottom: 1px solid #d5d5d5;
+    margin-bottom:2px;
+    padding-bottom:5px;
+}
+
 .tab-pane {
     margin-bottom:10px;
 }
@@ -816,6 +872,7 @@ table#grades_table pre{
     font-size:small;
 }
 
+<<<<<<< HEAD
 #math-pet {
     height:20em;
 }
@@ -823,4 +880,14 @@ table#grades_table pre{
 #math-pet-img {
     position:absolute;
     opacity:0;
+=======
+/* Equation editor bugfixes */
+#eqEditorDiv {
+    overflow:visible;
+}
+
+#openEqEditor {
+    min-height:35px;
+    min-width:43px;
+>>>>>>> 91058ed47da7aa14ba00101634704e7dede01d1f
 }

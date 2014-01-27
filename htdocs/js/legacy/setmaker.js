@@ -1,10 +1,33 @@
-var setmakerWebserviceURL = "/webwork2/instructorXMLHandler";
+var basicRequestObject = {
+    "xml_command":"listLib",
+    "pw":"",
+    "password":'change-me',
+    "session_key":'change-me',
+    "user":"user-needs-to-be-defined",
+    "library_name":"Library",
+    "courseID":'change-me',
+    "set":"set0",
+    "new_set_name":"new set",
+    "command":"buildtree"
+};
 
-// For watermark of sample text for adding set text box
-$(function() {
- $('input[example]').each(function(a,b) { $(b).watermark($(b).attr('example')+'   '  ) } )
- $('textarea[example]').each(function(a,b) { $(b).watermark($(b).attr('example')+'   ', {useNative:false}  ) } )
-});
+var basicWebserviceURL = "/webwork2/instructorXMLHandler";
+
+
+// Messaging
+
+function nomsg() {
+  $(".Message").html("");
+}
+
+function goodmsg(msg) {
+  $(".Message").html('<div class="ResultsWithoutError">'+msg+"</div>");
+}
+
+function badmsg(msg) {
+  $(".Message").html('<div class="ResultsWithError">'+msg+"</div>");
+}
+
 
 function settoggle(id, text1, text2) {
   $('#'+id).toggle(function() {$('#'+id).html(text2)}, 
@@ -14,6 +37,7 @@ function settoggle(id, text1, text2) {
 
 function toggle_content(id, text1, text2) {
   var e = $('#'+id);
+  nomsg();
   if(e.text() == text1)
     e.text(text2);
   else
@@ -21,47 +45,64 @@ function toggle_content(id, text1, text2) {
   return true;
 }
 
+function togglepaths() {
+  var toggle_from = $('#toggle_path_current')[0].value;
+  var new_text = $('#showtext');
+  nomsg();
+  if(toggle_from == 'show') {
+    new_text = $('#hidetext')[0].value;
+    $('#toggle_path_current').val('hide');
+	$("[id*=filepath]").each(function() {
+		// If showing, trigger
+		if(this.textContent.match('^Show')) {
+		  this.click();
+	    }
+	});
+  } else {
+    new_text = $('#showtext')[0].value;
+    $('#toggle_path_current').val('show');
+	$("[id*=filepath]").each(function() {
+		// If hidden, trigger
+		if(! this.textContent.match('^Show')) {
+		  this.click();
+		}
+	});
+  }
+  $('#toggle_paths').prop('value',new_text);
+  return false;
+}
+
 function init_webservice(command) {
   var myUser = $('#hidden_user').val();
   var myCourseID = $('#hidden_courseID').val();
   var mySessionKey = $('#hidden_key').val();
-  var requestObject = {
-    "xml_command":"listLib",
-    "pw":"",
-    "password":'change-me',
-    "session_key":'change-me',
-    "user":"user-needs-to-be-defined",
-    "library_name":"Library",
-    "courseID":'change-me',
-    "set_id":"set0",
-    "set":"set0",
-    "new_set_name":"new set",
-    "command":"buildtree"
-  };
-
+  var mydefaultRequestObject = {
+        };
+  _.defaults(mydefaultRequestObject, basicRequestObject);
   if (myUser && mySessionKey && myCourseID) {
-    requestObject.user = myUser;
-    requestObject.session_key = mySessionKey;
-    requestObject.courseID = myCourseID;
+    mydefaultRequestObject.user = myUser;
+    mydefaultRequestObject.session_key = mySessionKey;
+    mydefaultRequestObject.courseID = myCourseID;
   } else {
     alert("missing hidden credentials: user "
       + myUser + " session_key " + mySessionKey+ " courseID "
       + myCourseID, "alert-error");
     return null;
   }
-  requestObject.xml_command = command;
-  return requestObject;
+  mydefaultRequestObject.xml_command = command;
+  return mydefaultRequestObject;
 }
 
 function lib_update(who, what) {
   var child = { subjects : 'chapters', chapters : 'sections', sections : 'count'};
 
+  nomsg();
   var all = 'All ' + capFirstLetter(who);
 
   var mydefaultRequestObject = init_webservice('searchLib');
   if(mydefaultRequestObject == null) {
     // We failed
-    console.log("Could not get webservice request object");
+    // console.log("Could not get webservice request object");
     return false;
   }
   var subj = $('[name="library_subjects"] option:selected').val();
@@ -76,11 +117,6 @@ function lib_update(who, what) {
   if(lib_text == 'All Textbooks') { lib_text = '';};
   if(lib_textchap == 'All Chapters') { lib_textchap = '';};
   if(lib_textsect == 'All Sections') { lib_textsect = '';};
-	var levelstring='';
-	$('input:checkbox[name=level]:checked').each(function() {
-		levelstring = levelstring+$(this).val();
-	});
-  mydefaultRequestObject.library_levels = levelstring;
   mydefaultRequestObject.library_subjects = subj;
   mydefaultRequestObject.library_chapters = chap;
   mydefaultRequestObject.library_sections = sect;
@@ -89,19 +125,15 @@ function lib_update(who, what) {
   mydefaultRequestObject.library_textsection = lib_textsect;
   if(who == 'count') {
     mydefaultRequestObject.command = 'countDBListings';
-    console.log(mydefaultRequestObject);
-
-    return $.post(setmakerWebserviceURL, mydefaultRequestObject, function (data) {
+    // console.log(mydefaultRequestObject);
+    return $.post(basicWebserviceURL, mydefaultRequestObject, function (data) {
       var response = $.parseJSON(data);
-      console.log(response);
+      // console.log(response);
       var arr = response.result_data;
       arr = arr[0];
       var line = "There are "+ arr +" matching WeBWorK problems"
       if(arr == "1") {
         line = "There is 1 matching WeBWorK problem"
-      }
-      if(arr == "0") {
-        line = "There are no matching WeBWorK problems"
       }
       $('#library_count_line').html(line);
       return true;
@@ -116,10 +148,10 @@ function lib_update(who, what) {
   if(who=='sections' && chap=='') { return lib_update(who, 'clear'); }
   if(who=='sections') { subcommand = "getSectionListings";}
   mydefaultRequestObject.command = subcommand;
-  console.log(mydefaultRequestObject);
-  return $.post(setmakerWebserviceURL, mydefaultRequestObject, function (data) {
+  // console.log(mydefaultRequestObject);
+  return $.post(basicWebserviceURL, mydefaultRequestObject, function (data) {
       var response = $.parseJSON(data);
-      console.log(response);
+      // console.log(response);
       var arr = response.result_data;
       arr.splice(0,0,all);
       setselect('library_'+who, arr);
@@ -141,6 +173,7 @@ function capFirstLetter(string) {
 }
 
 function addme(path, who) {
+  nomsg();
   var target = $('[name="local_sets"] option:selected').val();
   if(target == 'Select a Set from this Course') {
     alert('You need to pick a target set above so we know what set to which we should add this problem.');
@@ -149,10 +182,10 @@ function addme(path, who) {
   var mydefaultRequestObject = init_webservice('addProblem');
   if(mydefaultRequestObject == null) {
     // We failed
-    console.log("Could not get webservice request object");
+	badmsg("Could not connect back to server");
     return false;
   }
-  
+  mydefaultRequestObject.set_id = target;
   var pathlist = new Array();
   if(who=='one') {
     pathlist.push(path);
@@ -162,8 +195,9 @@ function addme(path, who) {
       pathlist.push(allprobs[i].value);
     }
   }
-  mydefaultRequestObject.set_id = target;
-  addemcallback(setmakerWebserviceURL, mydefaultRequestObject, pathlist, 0)(true);
+  mydefaultRequestObject.total = pathlist.length;
+  mydefaultRequestObject.set = target;
+  addemcallback(basicWebserviceURL, mydefaultRequestObject, pathlist, 0)(true);
 }
 
 function addemcallback(wsURL, ro, probarray, count) {
@@ -173,7 +207,15 @@ function addemcallback(wsURL, ro, probarray, count) {
       if(count!=1) { phrase += "s";}
      // alert("Added "+phrase+" to "+ro.set);
       markinset();
-      return true;};
+
+	  var prbs = "problems";
+	  if(ro.total == 1) { 
+		prbs = "problem";
+	  }
+	  goodmsg("Added "+ro.total+" "+prbs+" to set "+ro.set_id);
+
+      return true;
+    };
   }
   // Need to clone the object so the recursion works
   var ro2 = jQuery.extend(true, {}, ro);
@@ -193,12 +235,13 @@ function markinset() {
   var shownprobs = $('[name^="filetrial"]'); // shownprobs.value
   ro.set_id = target;
   ro.command = 'true';
-  return $.post(setmakerWebserviceURL, ro, function (data) {
+  return $.post(basicWebserviceURL, ro, function (data) {
     var response = $.parseJSON(data);
-    console.log(response);
+    // console.log(response);
     var arr = response.result_data;
     var pathhash = {};
     for(var i=0; i<arr.length; i++) {
+      arr[i] = arr[i].replace(/^\//,'');
       pathhash[arr[i]] = 1;
     }
     for(var i=0; i< shownprobs.length; i++) {
@@ -214,6 +257,7 @@ function markinset() {
 }
 
 function delrow(num) { 
+  nomsg();
   var path = $('[name="filetrial'+ num +'"]').val();
   var APLindex = findAPLindex(path);
   var mymlt = $('[name="all_past_mlt'+ APLindex +'"]').val();
@@ -279,29 +323,47 @@ function delFromPGList(num, path) {
 }
 
 function randomize(filepath, el) {
+  nomsg();
   var seed = Math.floor((Math.random()*10000));
   var ro = init_webservice('renderProblem');
   var templatedir = $('#hidden_templatedir').val();
   ro.problemSeed = seed;
   ro.problemSource = templatedir + '/' + filepath;
   ro.set = ro.problemSource;
+  var showhint = 0;
+  if($("input[name='showHints']").is(':checked')) { showhint = 1;}
+  var showsoln = 0;
+  if($("input[name='showSolutions']").is(':checked')) { showsoln = 1;}
+  ro.showHints = showhint;
+  ro.showSolutions = showsoln;
   var displayMode = $('[name="original_displayMode"]').val();
   if(displayMode != 'None') {
     ro.displayMode = displayMode;
   }
   ro.noprepostambles = 1;
-  $.post(setmakerWebserviceURL, ro, function (data) {
+  $.post(basicWebserviceURL, ro, function (data) {
     var response = data;
     $('#'+el).html(data);
     // run typesetter depending on the displaymode
     if(displayMode=='MathJax')
       MathJax.Hub.Queue(["Typeset",MathJax.Hub,el]);
+    if(displayMode=='jsMath')
+      jsMath.ProcessBeforeShowing(el);
+
+    if(displayMode=='asciimath') {
+      //processNode(el);
+      translate();
+    }
+    if(displayMode=='LaTeXMathML') {
+      AMprocessNode(document.getElementsByTagName("body")[0], false);
+    }
     //console.log(data);
   });
   return false;
 }
 
 function togglemlt(cnt,noshowclass) {
+  nomsg();
   var count = $('.'+noshowclass).length;
   var n1 = $('#lastshown').text();
   var n2 = $('#totalshown').text();

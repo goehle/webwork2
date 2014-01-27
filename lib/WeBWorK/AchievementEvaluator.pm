@@ -26,7 +26,11 @@ use strict;
 use warnings;
 use WeBWorK::CGI;
 use WeBWorK::Utils qw(before after readFile sortAchievements);
+<<<<<<< HEAD
 use WeBWorK::MathPet;
+=======
+use WeBWorK::Utils::Tags;
+>>>>>>> 91058ed47da7aa14ba00101634704e7dede01d1f
 
 use WWSafe;
 use Storable qw(nfreeze thaw);
@@ -75,6 +79,7 @@ sub checkForAchievements {
     our $nextLevelPoints = $globalUserAchievement->next_level_points;
     our $localData = {};
     our $globalData = {};
+    our $tags;
 
     my $compartment = new WWSafe;
 
@@ -122,6 +127,10 @@ sub checkForAchievements {
 	$globalData->{'completeSets'}++;
     }
 
+    # get the problem tags
+    my $templateDir = $ce->{courseDirs}->{templates};
+    $tags = WeBWorK::Utils::Tags->new($templateDir.'/'.$problem->source_file());
+
     #These variables are shared with the safe compartment.  The achievement evaulators
     # have access too 
     # $problem - the problem data;
@@ -133,9 +142,23 @@ sub checkForAchievements {
     # $nextLevelPoints - only should be used by 'level' achievements
     # $set - the set data
     # $achievementPoints - the number of achievmeent points
+    # $tags -this is the tag data associated to the problem from the problem library
 
     $compartment->share(qw($problem @setProblems $localData $maxCounter 
-             $globalData $counter $nextLevelPoints $set $achievementPoints));
+             $globalData $counter $nextLevelPoints $set $achievementPoints $tags));
+
+
+    #load any preamble code
+    # this line causes the whole file to be read into one string
+    local $/;
+    my $preamble = '';
+    my $source;
+    if (-e 
+	"$ce->{courseDirs}->{achievements}/$ce->{achievementPreambleFile}") {
+	open(PREAMB, '<', "$ce->{courseDirs}->{achievements}/$ce->{achievementPreambleFile}");
+	$preamble = <PREAMB>;
+	close(PREAMB);
+    }
 
     #loop through the various achievements, see if they have been obtained, 
     foreach my $achievement (@achievements) {
@@ -157,7 +180,16 @@ sub checkForAchievements {
 
 	#check the achievement using Safe
 	my $sourceFilePath = $ce->{courseDirs}->{achievements}.'/'.$achievement->test;
-	my $earned = $compartment->rdo($sourceFilePath);
+	if (-e $sourceFilePath) {
+	    open(SOURCE,'<',$sourceFilePath);
+	    $source = <SOURCE>;
+	    close(SOURCE);
+	} else {
+	    warn('Couldnt find achievement evaluator $sourceFilePath');
+	    next;
+	};
+
+	my $earned = $compartment->reval($preamble."\n".$source);
 	warn "There were errors in achievement $achievement_id\n".$@ if $@;
 
 	#if we have a new achievement then update achievement points
@@ -182,7 +214,7 @@ sub checkForAchievements {
 	    $cheevoMessage .= CGI::start_div({class=>'cheevopopuptext'});  
 	    if ($achievement->category eq 'level') {
 		
-			$cheevoMessage = $cheevoMessage . CGI::h1("Level Up: $achievement->{name}");
+			$cheevoMessage = $cheevoMessage . CGI::h2("$achievement->{name}");
 			#print out description as part of message if we are using items
 			
 			$cheevoMessage .= CGI::div($ce->{achievementItemsEnabled} ?  $achievement->{description} : "Congratulations, you earned a new level!");
@@ -190,7 +222,7 @@ sub checkForAchievements {
 
 	    } else {
 		
-			$cheevoMessage .=  CGI::h1("Mathchievment Unlocked: $achievement->{name}");
+			$cheevoMessage .=  CGI::h2("$achievement->{name}");
 			$cheevoMessage .=  CGI::div("<i>$achievement->{points} Points</i>: $achievement->{description}");
 			$cheevoMessage .= CGI::end_div();
 	    }

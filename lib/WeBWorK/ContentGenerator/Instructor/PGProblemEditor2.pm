@@ -23,7 +23,7 @@ use constant DEFAULT_SEED => 123456;
 
 =head1 NAME
 
-WeBWorK::ContentGenerator::Instructor::PGProblemEditor2 - Edit a pg file
+WeBWorK::ContentGenerator::Instructor::PGProblemEditor2 - Edit a pg file#
 
 =cut
 
@@ -403,14 +403,14 @@ sub initialize  {
 sub path {
 	my ($self, $args) = @_;
 	my $r = $self->r;
-	my $urlpath = $r->urlpath;
-	my $courseName  = $urlpath->arg("courseID");
-	my $setName = $r->urlpath->arg("setID") || '';
-	my $problemNumber = $r->urlpath->arg("problemID") || '';
+	my $urlpath       = $r->urlpath;
+	my $courseName    = $urlpath->arg("courseID");
+	my $setName       = $urlpath->arg("setID") || '';
+	my $problemNumber = $urlpath->arg("problemID") || '';
 
 	# we need to build a path to the problem being edited by hand, since it is not the same as the urlpath
 	# For this page the bread crum path leads back to the problem being edited, not to the Instructor tool.
-	my @path = ( 'WeBWork', $r->location,
+	my @path = ( 'WeBWorK', $r->location,
 	          "$courseName", $r->location."/$courseName",
 	          "$setName",    $r->location."/$courseName/$setName",
 	          "$problemNumber", $r->location."/$courseName/$setName/$problemNumber",
@@ -1262,6 +1262,7 @@ sub getActionParams {
 sub fixProblemContents {
 		#NOT a method
 		my $problemContents = shift;
+		
 		# Handle the problem of line endings.  
 		# Make sure that all of the line endings are of unix type.  
 		# Convert \r\n to \n

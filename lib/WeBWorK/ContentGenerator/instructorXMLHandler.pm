@@ -157,7 +157,7 @@ sub pre_header_initialize {
 	my ($self) = @_;
 	my $r = $self->r;
  
- 	
+ 	# debug($r->param("visible"));	
  
  
  
@@ -176,30 +176,30 @@ sub pre_header_initialize {
 	
 	my $input = {#can I just use $->param? it looks like a hash
 
-		     pw              =>   $r->param('pw') ||undef,
-		     session_key     =>   $r->param("session_key") ||undef,
-		     userID          =>   $r->param("user") ||undef,
-		     library_name    =>   $r->param( "library_name") ||undef,
-		     user        	 =>   $r->param("user") ||undef,
-		     set             =>   $r->param("set") ||undef,
-		     fileName        =>   $r->param("file_name") ||undef,
-		     new_set_name	 =>	  $r->param("new_set_name") ||undef,
-		     probList		 =>	  $r->param("probList") ||undef,
-		     command     	 =>   $r->param("command") ||undef,
-		     subcommand		 =>   $r->param("subcommand") ||undef,
-		     maxdepth		 =>	  $r->param("maxdepth") || 0,
-		     problemSeed	 =>	  $r->param("problemSeed") || 0,
-		     displayMode	 =>	  $r->param("displayMode") || undef,
-		     noprepostambles	 =>	  $r->param("noprepostambles") || undef,
-		     library_subjects	=> 	$r->param("library_subjects") ||undef,
-		     library_chapters	=> 	$r->param("library_chapters") ||undef,
-		     library_sections	=> 	$r->param("library_sections") ||undef,
-		     library_textbook	=> 	$r->param("library_textbook") ||undef,
-		     library_keywords	=> 	$r->param("library_keywords") ||undef,
-		     library_textchapter	=> 	$r->param("library_textchapter") ||undef,
-		     library_textsection	=> 	$r->param("library_textsection") ||undef,
-		     library_levels	=> 	$r->param("library_levels") ||'',
-		     source			 =>   '',
+		    pw                      => $r->param('pw') ||undef,
+		    session_key             => $r->param("session_key") ||undef,
+		    userID                  => $r->param("user") ||undef,
+		    library_name            => $r->param("library_name") ||undef,
+		    user        	        => $r->param("user") ||undef,
+		    set                     => $r->param("set") ||undef,
+		    fileName                => $r->param("file_name") ||undef,
+		    new_set_name	        => $r->param("new_set_name") ||undef,
+		    probList		        => $r->param("probList") ||undef,
+		    command     	        => $r->param("command") ||undef,
+		    subcommand		        => $r->param("subcommand") ||undef,
+		    maxdepth		        => $r->param("maxdepth") || 0,
+		    problemSeed	            => $r->param("problemSeed") || 0,
+		    displayMode	            => $r->param("displayMode") || undef,
+		    noprepostambles	        => $r->param("noprepostambles") || undef,
+		    library_subjects	    => $r->param("library_subjects") ||undef,
+		    library_chapters	    => $r->param("library_chapters") ||undef,
+		    library_sections	    => $r->param("library_sections") ||undef,
+		    library_levels		    => $r->param("library_levels") ||undef,
+		    library_textbook	    => $r->param("library_textbook") ||undef,
+		    library_keywords	    => $r->param("library_keywords") ||undef,
+		    library_textchapter     => $r->param("library_textchapter") ||undef,
+		    library_textsection     => $r->param("library_textsection") ||undef,
+		    source			        =>  '',
 
 		     #course stuff
 		    first_name       		=> $r->param('first_name') || undef,
@@ -207,7 +207,7 @@ sub pre_header_initialize {
             student_id     			=> $r->param('student_id') || undef,
             id             			=> $r->param('user_id') || undef,
             email_address  			=> $r->param('email_address') || undef,
-            permission     			=> $r->param('permission') || 0,	# valid values from %userRoles in defaults.config
+            permission     			=> $r->param('permission') // 0,	# valid values from %userRoles in defaults.config
             status         			=> $r->param('status') || undef,#'Enrolled, audit, proctor, drop
             section        			=> $r->param('section') || undef,
             recitation     			=> $r->param('recitation') || undef,
@@ -222,8 +222,8 @@ sub pre_header_initialize {
 	     	open_date       	   	=> $r->param('open_date') || undef,
             due_date        	   	=> $r->param('due_date') || undef,
             answer_date     	   	=> $r->param('answer_date') || undef,
-            visible         	   	=> $r->param('visible') || undef,
-            enable_reduced_scoring 	=> $r->param('enable_reduced_scoring') || undef,
+            visible         	   	=> $r->param('visible') || 0,
+            enable_reduced_scoring 	=> $r->param('enable_reduced_scoring') || 0,
             assignment_type        	=> $r->param('assignment_type') || undef,
             attempts_per_version   	=> $r->param('attempts_per_version') || undef,
             time_interval         	=> $r->param('time_interval') || undef,
@@ -246,6 +246,12 @@ sub pre_header_initialize {
             place 					=> $r->param('place') || undef,
             path 					=> $r->param('path') || undef, 
             selfassign 			    => $r->param('selfassign') || undef, 
+            pgCode					=> $r->param('pgCode') || undef,
+            sendViaJSON				=> $r->param('sendViaJSON') || undef,
+            assigned_users	        => $r->param('assigned_users') || undef,
+            overrides				=> $r->param('overrides') || undef,
+			showHints				=> $r->param('showHints') || 0,
+			showSolutions			=> $r->param('showSolutions') || 0,
 	};
 	if ($UNIT_TESTS_ON) {
 		print STDERR "instructorXMLHandler.pm ".__LINE__." values obtained from form parameters\n\t",
@@ -264,13 +270,19 @@ sub pre_header_initialize {
 	$input = {%$std_input, %$input};
 	# Fix the environment display mode
 	$input->{envir}->{displayMode} = $input->{displayMode} if($input->{displayMode});
+	# Set environment variables for hints/solutions
+	$input->{envir}->{showHints} = $r->param('showHints') if($r->param('showHints'));
+	$input->{envir}->{showSolutions} = $r->param('showSolutions') if($r->param('showSolutions'));
 	
+	## getting an error below (pstaab on 6/10/2013)  I don't this this is used anymore.  
+
+
 	##########################################
 	# FIXME hack to get fileName or filePath   param("set") contains the path
-	my $problemPath = $input->{set};   # FIXME should rename this ????
-	$problemPath =~ m|templates/(.*)|;
-	$problemPath = $1;    # get everything in the path after templates
-	$input->{envir}->{fileName}= $problemPath;
+	# my $problemPath = $input->{set};   # FIXME should rename this ????
+	# $problemPath =~ m|templates/(.*)|;
+	# $problemPath = $1;    # get everything in the path after templates
+	# $input->{envir}->{fileName}= $problemPath;
 	##################################################
 	$input->{courseID} = $r->param('courseID');
 
@@ -299,7 +311,8 @@ sub pre_header_initialize {
 	    	$input->{envir}->{fileName}=$problemPath;
 	    }
 		$self->{output}->{problem_out} = $xmlrpc_client->xmlrpcCall('renderProblem', $input);
-			
+		my @params = join(" ", $r->param() ); # this seems to be necessary to get things read.?
+		# FIXME  -- figure out why commmenting out the line above means that $envir->{fileName} is not defined. 
 		#$self->{output}->{text} = "Rendered problem";
 	} else {	
 		$self->{output} = $xmlrpc_client->xmlrpcCall($r->param("xml_command"), $input);
@@ -352,8 +365,8 @@ Regression
 		envir                   => environment(),
 		problem_state           => {
 		
-			num_of_correct_ans  => 2,
-			num_of_incorrect_ans => 4,
+			num_of_correct_ans  => 200, # we are picking phoney values so
+			num_of_incorrect_ans => 400,
 			recorded_score       => 1.0,
 		},
 		source                   => '',  #base64 encoded
@@ -381,7 +394,7 @@ sub environment {
 		dueDate=> '4014438528',
 		externalGif2EpsPath=>'not defined',
 		externalPng2EpsPath=>'not defined',
-		fileName=>'the XMLHandlerenvironment->{fileName} should be set',
+		fileName=>'the XMLHandler environment->{fileName} should be set',
 		formattedAnswerDate=>'6/19/00',
 		formattedDueDate=>'6/19/00',
 		formattedOpenDate=>'6/19/00',
@@ -412,10 +425,9 @@ sub environment {
 		PRINT_FILE_NAMES_FOR => [ ],
 		probFileName => 'probFileName should not be used --use fileName instead',
 		problemSeed  => 1234,
-		problemValue =>1,
+		problemValue => -1,
 		probNum => 13,
 		psvn => 54321,
-		psvn=> 54321,
 		questionNumber => 1,
 		scriptDirectory => 'Not defined',
 		sectionName => 'Gage',
@@ -436,6 +448,7 @@ sub pretty_print_json {
     shift if UNIVERSAL::isa($_[0] => __PACKAGE__);
 	my $rh = shift;
 	my $indent = shift || 0;
+	
 	my $out = "";
 	my $type = ref($rh);
 
@@ -493,7 +506,7 @@ sub content {
 		if($self->{output}->{ra_out}){
 			# print '"result_data":'.pretty_print_json($self->{output}->{ra_out}).'}';
 			if (ref($self->{output}->{ra_out})) {
-			print '"result_data": ' . to_json($self->{output}->{ra_out}) .'}';
+				print '"result_data": ' . to_json($self->{output}->{ra_out}) .'}';
 			} else {
 				print '"result_data": "' . $self->{output}->{ra_out} . '"}';
 			}

@@ -206,16 +206,27 @@ sub body {
 	    my @setIDs = $db->listUserSets($userID);
 	    my @setProblemCount;
 	    
-	    for (my $i=0; $i<$#setIDs; $i++) {
-		$setProblemCount[$i] = $db->countUserProblems($userID,$setIDs[$i]);
-	    }
-	    
 	    my @userSetIDs = map {[$userID, $_]} @setIDs;
-	    my @sets = $db->getMergedSets(@userSetIDs);
+	    my @unfilteredsets = $db->getMergedSets(@userSetIDs);
+	    my @sets;
 	    
+	    # achievement items only make sense for regular homeworks
+	    # so filter gateways out
+	    foreach my $set (@unfilteredsets) {
+		if ($set->assignment_type() eq 'default') {
+		    push @sets, $set;
+		}
+	    }	    
+
+	    # Generate array of problem counts
+	    for (my $i=0; $i<=$#sets; $i++) {		
+		$setProblemCount[$i] = $db->countUserProblems($userID,$sets[$i]->set_id);
+	    }
+
 	    print CGI::h2("Items");
 
 	    if (@items) {
+			    
 		my $itemnumber = 0;
 		foreach my $item (@items) {
 		    # Print each items name and description 
@@ -237,6 +248,7 @@ sub body {
 		    #the current sets to help set up the form fields. 
 		    print $item->print_form(\@sets,\@setProblemCount,$r);
 		    print CGI::hidden({name=>"useditem", value=>"$itemnumber"});
+		    print $self->hidden_authen_fields;
 		    print CGI::end_div();
 		    print CGI::start_div({-class=>"modal-footer"});
 		    print CGI::submit({value=>"Submit"});

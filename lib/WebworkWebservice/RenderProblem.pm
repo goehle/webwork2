@@ -61,7 +61,7 @@ our $HOSTURL      = "$PROTOCOL://$HOST_NAME:$PORT";
 
 
 
-our $UNIT_TESTS_ON =0;
+our $UNIT_TESTS_ON =1;
 # 
 # #our $ce           = $WebworkWebservice::SeedCE;
 # # create a local course environment for some course
@@ -117,6 +117,7 @@ use constant DISPLAY_MODE_FAILOVER => {
 sub renderProblem {
 	my $self = shift;
     my $rh = shift;
+    
 
 ###########################################
 # Grab the course name, if this request is going to depend on 
@@ -128,7 +129,6 @@ sub renderProblem {
 	my $user;
 	my $beginTime = new Benchmark;
 
-	debug("in RenderProblem::renderProblem");
 # 	if (defined($self->{courseName}) and $self->{courseName} ) {
 # 		$courseName = $self->{courseName};
 # 	} elsif (defined($rh->{course}) and $rh->{course}=~/\S/ ) {
@@ -147,7 +147,7 @@ sub renderProblem {
     
 	#FIXME  put in check to make sure the course exists.
 	eval {
-		$ce           = WeBWorK::CourseEnvironment->new({webwork_dir=>$WW_DIRECTORY, courseName=> $courseName});
+		$ce = WeBWorK::CourseEnvironment->new({webwork_dir=>$WW_DIRECTORY, courseName=> $courseName});
 		$ce->{apache_root_url}= $HOSTURL;
 	# Create database object for this course
 		$db = WeBWorK::DB->new($ce->{dbLayout});
@@ -189,7 +189,6 @@ sub renderProblem {
     local $SIG{__WARN__} = $warning_handler;
 
 
-
 ###########################################
 # Determine the method for accessing data   ???? what was this
 ###########################################
@@ -203,7 +202,6 @@ sub renderProblem {
 	# One of 
 	#   data_from_course
 	#   data_from_request
-
 ###########################################
 # Determine an effective user for this interaction
 # or create one if it is not given
@@ -274,6 +272,15 @@ sub renderProblem {
 	my $problemAttempted = ($num_correct || $num_incorrect);
 	my $lastAnswer    = '';
 	
+	debug("setName: " . $setName);
+	debug("problemNumber: ". $problemNumber);
+	debug("problemSeed:" . $problemSeed);
+	debug("psvn: " . $psvn);
+	debug("problemStatus:" . $problemStatus);
+	debug("problemValue: " . $problemValue);
+
+
+
 	my $setRecord = $db->getMergedSet($effectiveUserName, $setName);
  	unless (defined($setRecord) and ref($setRecord) ) {
 		# if a User Set does not exist for this user and this set
@@ -319,24 +326,42 @@ sub renderProblem {
 		$problemRecord->problem_seed($problemSeed);
 		$problemRecord->status($problemStatus);
 		$problemRecord->value($problemValue);
-		$problemRecord->attempted($problemAttempted);
+		# We are faking it
+		#$problemRecord->attempted($problemAttempted);
+		#$problemRecord->num_correct($num_correct);
+		#$problemRecord->num_incorrect($num_incorrect);
+		$problemRecord->attempted(2000);
+		$problemRecord->num_correct(1000);
+		$problemRecord->num_incorrect(1000);
 		$problemRecord->last_answer($lastAnswer);
-		$problemRecord->num_correct($num_correct);
-		$problemRecord->num_incorrect($num_incorrect);
 	}
 	# initialize problem source
+	$rh->{sourceFilePath} = $rh->{path} unless defined $rh->{sourceFilePath};
+	if ($UNIT_TESTS_ON){
+			print STDERR "template directory path ", $ce->{courseDirs}->{templates},"\n";
+			print STDERR "RenderProblem.pm: source file is ", $rh->{sourceFilePath},"\n";
+			print STDERR "RenderProblem.pm: problem source is included in the request \n" if defined($rh->{source});
+	}	
+
+
 	my $problem_source;
 	my $r_problem_source =undef;
-  	if (defined($rh->{source})) {
+ 	if (defined($rh->{source}) and $rh->{source}) {
   		$problem_source = decode_base64($rh->{source});
   		$problem_source =~ tr /\r/\n/;
 		$r_problem_source =\$problem_source;
+		# warn "source included in request";
 		$problemRecord->source_file($rh->{envir}->{fileName}) if defined $rh->{envir}->{fileName};
-  	} elsif (defined($rh->{sourceFilePath}) and $rh->{sourceFilePath} =/\S/)  {
+  	} elsif (defined($rh->{sourceFilePath}) and $rh->{sourceFilePath} =~/\S/)  {
   	    $problemRecord->source_file($rh->{sourceFilePath});
+  	    warn "reading source from ", $rh->{sourceFilePath};
+  	    $problem_source = WeBWorK::PG::IO::read_whole_file($ce->{courseDirs}->{templates}.'/'.$rh->{sourceFilePath});
+  	    #warn "source is ", $problem_source;
+  	    $r_problem_source = \$problem_source;
   	}
-	$problemRecord->source_file('foobar') unless defined($problemRecord->source_file);
+	$problemRecord->source_file('RenderProblemFooBar') unless defined($problemRecord->source_file);
 	if ($UNIT_TESTS_ON){
+			print STDERR "template directory path ", $ce->{courseDirs}->{templates},"\n";
 			print STDERR "RenderProblem.pm: source file is ", $problemRecord->source_file,"\n";
 			print STDERR "RenderProblem.pm: problem source is included in the request \n" if defined($rh->{source});
 	}
@@ -365,7 +390,7 @@ sub renderProblem {
 	my $key        = $rh->{envir}->{key} || '';
 
 	local $ce->{pg}{specialPGEnvironmentVars}{problemPreamble} = {TeX=>'',HTML=>''} if($rh->{noprepostambles});
-        local $ce->{pg}{specialPGEnvironmentVars}{problemPostamble} = {TeX=>'',HTML=>''} if($rh->{noprepostambles});
+    local $ce->{pg}{specialPGEnvironmentVars}{problemPostamble} = {TeX=>'',HTML=>''} if($rh->{noprepostambles});
 	
 	#check definitions
 	#warn "setRecord is ", WebworkWebservice::pretty_print_rh($setRecord);
@@ -702,8 +727,6 @@ sub new {
 # 	
 # 	return \%envir;
 # }
-
-
 
 
 1;

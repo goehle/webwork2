@@ -4,7 +4,13 @@ $(function(){
     $('input:submit').addClass('btn btn-primary');
     $('.nav_button').addClass('btn btn-primary');
     $('.classlist').addClass('table table-condensed classlist-table');
+
+    // Make grey_buttons disabled buttons
+    $('.gray_button').addClass('btn disabled').removeClass('gray_button');
     
+    // Make grey_buttons disabled buttons
+    $('.gray_button').addClass('btn disabled').removeClass('gray_button');
+
     // replace pencil gifs by something prettier
     $('td a:has(img[src$="edit.gif"])').each(function () { $(this).html($(this).html().replace(/<img.*>/," <i class='icon-pencil'></i>")); });
 
@@ -54,19 +60,18 @@ $(function(){
     $('.problem .problem-content').addClass('well well-small');
 
     $("table.attemptResults td[onmouseover*='Tip']").each(function () {
-	var data = $(this).attr('onmouseover').match(/Tip\('(.*)'/)[1];
+	var data = $(this).attr('onmouseover').match(/Tip\('(.*)'/);
+	if (data) { data = data[1] }; // not sure I understand this, but sometimes the match fails 
+	//on the presentation of a matrix  and then causes errors throughout the rest of the script
 	$(this).attr('onmouseover','');
 	if (data) {
 	    $(this).wrapInner('<div class="results-popover" />');
-	    var titlestr ='<i class=" answer-popover icon-remove" onclick="$($($(this).parents()[2]).children()[0]).popover(\'hide\');"></i>';
+
 	    var popdiv = $('div', this);
-	    popdiv.popover({placement:'bottom', html:'true', trigger:'click',title: titlestr ,content:data});	
+	    popdiv.popover({placement:'bottom', html:'true', trigger:'click',content:data});	
 	} 
 	    
     });
-    
-    // Past answers formatting
-    $('#past-answer-table').addClass('table');
     
     // Grades formatting
     $('#grades_table').addClass('table table-bordered table-condensed');
@@ -75,11 +80,7 @@ $(function(){
     //Problem Grader formatting
     $('#problem-grader-form').addClass('form-inline');
     $('#problem-grader-form input:button').addClass('btn btn-small btn-info');
-
-    //Instructor Tools formatting
-    $('.ButtonRow .btn').addClass('btn-mini');
-    $('.ButtonRowCenter .btn').addClass('btn-mini');
-    $('.ScrollingRecordList .btn').addClass('btn-small');
+    $('#problem-grader-form td').find('p:last').removeClass('essay-answer graded-answer');
 
     //CourseConfiguration
     $('#config-form').addClass('form-inline');
@@ -91,7 +92,6 @@ $(function(){
 
     //Classlist Editor 1&2 configuration
     $('#classlist-form').addClass('form-inline user-list-form');
-    $('.user-list-form select').addClass('input-medium');
     $('.user-list-form input:button').addClass('btn btn-info');
     $('.user-list-form input:reset').addClass('btn btn-info');
     $('.user-list-form').wrapInner('<div />');
@@ -99,25 +99,28 @@ $(function(){
     $('.classlist-table').attr('border',0);
     $('.classlist-table').attr('cellpadding',0);
     $('#show_hide').addClass('btn btn-info');
+    $('#new-users-form table').addClass('table table-condensed');
+    $('#new-users-form .section-input, #new-users-form .recitation-input').attr('size','4');
+    $('#new-users-form .last-name-input, #new-users-form .first-name-input, #new-users-form .user-id-input').attr('size','10');
 
     //Homework sets editor config
     $('#problemsetlist').addClass('form-inline set-list-form');
     $('#problemsetlist2').addClass('form-inline set-list-form');
-    $('.set-id-tooltip').tooltip().click(function() {});
-    $('.set-list-form select').addClass('input-medium');
-    $('.set-list-form input:text').addClass('input-medium');
-    $('.set-list-form select[name="action.filter.scope"]').addClass('input-large').removeClass('input-medium');
-    $('.set-list-form select[name="action.import.source"]').addClass('input-large').removeClass('input-medium');
+    $('.set-id-tooltip').tooltip({trigger: 'hover'});
     $('.set-list-form input:button').addClass('btn btn-info');
     $('.set-list-form input:reset').addClass('btn btn-info');
     $('.set-list-form').wrapInner('<div />');
     $('.set_table').addClass('small-table-text table table-condensed');
-    $('.set_table input:text').removeClass('input-medium');
     $('#show_hide').addClass('btn btn-info');
     $('#problem_set_form').addClass('form-inline');
     $('#user-set-form').addClass('form-inline user-assign-form');
     $('#set-user-form').addClass('form-inline user-assign-form');
-
+    $('.set_table input[name="selected_sets"]').each(function () {
+	var label = $(this).parent().children('label');
+	label.prepend(this);
+	label.addClass('checkbox');
+    });
+    
     //PG editor styling
     $('#editor').addClass('form-inline span9');
     $('#editor a').addClass('btn btn-small btn-info');
@@ -125,7 +128,6 @@ $(function(){
 
     //Achievement Editor
     $('#achievement-list').addClass('form-inline user-list-form');
-    $('.user-list-form select').addClass('input-medium');
     $('.user-list-form input:button').addClass('btn btn-info');
     $('.user-list-form input:reset').addClass('btn btn-info');
     $('.user-list-form').wrapInner('<div />');
@@ -151,7 +153,7 @@ $(function(){
     $('#mainform .btn').addClass('btn-small');
     $('#mainform .InfoPanel select').addClass('input-xxlarge');
     $('#mainform select[name=mydisplayMode]').addClass('input-small').removeClass('input-xxlarge');
-    $('#mainform select[name=local_sets]').addClass('input-small').removeClass('input-xxlarge');
+    $('#mainform select[name=local_sets]').addClass('input').removeClass('input-xxlarge');
     $('#mainform select[name=max_shown]').addClass('input-small').removeClass('input-xxlarge');
 
     //Change tabber tabs to twitter tabs
@@ -164,9 +166,19 @@ $(function(){
     if ($('li.tabberactive a').length > 0) { 
         $('li.tabberactive a').tab('show');}
 
-     //GAtewayQuiz
+    //past answer table
+    $('.past-answer-table').addClass("table table-striped");
+
+     //GatewayQuiz
     $('.gwPrintMe a').addClass('btn btn-info');
     $('.gwPreview a').addClass('btn');
 
-})
+    // the datepicker uses addOnLoadEvent, so if this function isn't defined,
+    // we dont have to worry about the datepicker.
+    if (typeof(addOnLoadEvent) === 'function') {
+	addOnLoadEvent( function () {
+	    $('.ui-datepicker-trigger').addClass('btn').parent().addClass('input-append');
+	});
+    }
+});    
 

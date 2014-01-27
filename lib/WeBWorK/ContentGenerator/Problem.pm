@@ -43,11 +43,7 @@ use URI::Escape;
 use WeBWorK::Localize;
 use WeBWorK::Utils::Tasks qw(fake_set fake_problem);
 use WeBWorK::AchievementEvaluator;
-<<<<<<< HEAD
 use WeBWorK::MathPet;
-use HTML::Scrubber;
-=======
->>>>>>> 91058ed47da7aa14ba00101634704e7dede01d1f
 
 ################################################################################
 # CGI param interface to this module (up-to-date as of v1.153)

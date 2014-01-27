@@ -26,11 +26,8 @@ use strict;
 use warnings;
 use WeBWorK::CGI;
 use WeBWorK::Utils qw(before after readFile sortAchievements);
-<<<<<<< HEAD
 use WeBWorK::MathPet;
-=======
 use WeBWorK::Utils::Tags;
->>>>>>> 91058ed47da7aa14ba00101634704e7dede01d1f
 
 use WWSafe;
 use Storable qw(nfreeze thaw);

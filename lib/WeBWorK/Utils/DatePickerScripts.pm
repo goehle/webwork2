@@ -75,19 +75,13 @@ open_rule.datetimepicker({
     onClose: function(dateText, inst) {
         update();
     },
-<<<<<<< HEAD
-=======
 
->>>>>>> 91058ed47da7aa14ba00101634704e7dede01d1f
 /* the minDate option of datetimepicker is clobbering the time in the target
    object for some reason.  Commenting this out means that the dates dont
-   change quite as dynamically, but they are still updated by the update() call
+   change quite as dynamically, but they are still updated by the update() 
+   call
 
-<<<<<<< HEAD
    onSelect: function (selectedDateTime){
-=======
-    onSelect: function (selectedDateTime){
->>>>>>> 91058ed47da7aa14ba00101634704e7dede01d1f
         var open = \$(this).datetimepicker('getDate');
 	var open_obj = new Date(open.getTime());
 	open_rule.addClass("auto-changed");
@@ -115,11 +109,7 @@ due_rule.datetimepicker({
 /*    onSelect: function (selectedDateTime){
         var due = \$(this).datetimepicker('getDate');
 	answer_rule.datetimepicker('option', 'minDateTime', new Date(due.getTime()));
-<<<<<<< HEAD
-    }*/
-=======
 	} */
->>>>>>> 91058ed47da7aa14ba00101634704e7dede01d1f
 });
 
 answer_rule.datetimepicker({

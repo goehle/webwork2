@@ -39,10 +39,6 @@
 
 <script type="text/javascript" src="<!--#url type="webwork" name="htdocs"-->/js/vendor/bootstrap/js/bootstrap.js"></script>
 
-<!-- Math pets scripts -->
-<script type="text/javascript", src="<!--#url type="webwork" name="htdocs"-->/js/apps/MathPet/jQueryRotate.js"></script>	
-<script type="text/javascript", src="<!--#url type="webwork" name="htdocs"-->/js/apps/MathPet/mathpet.js"></script>	
-
 <!--#if can="output_achievement_CSS"-->
 <link rel="stylesheet" type="text/css" href="<!--#url type="webwork" name="htdocs"-->/themes/math4/achievements.css"/>
 <!--#endif-->
@@ -302,7 +298,7 @@ var tabberOptions = {manualStartup:true};
 <div class="row-fluid"><div id="math-pet" class="span8">
 	<!--#output_math_pet-->
 </div><div class="span4"></div></div>
-<!--#end-->
+<!--#endif-->
 
 </div><!--content-->
 

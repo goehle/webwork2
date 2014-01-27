@@ -1721,7 +1721,10 @@ sub output_math_pet {
     my $user = $r->param('user');
 
     if ($ce->{mathPetEnabled}) {
- 	print CGI::script({type=>"text/javascript"},WeBWorK::MathPet::getPetData($user,$ce,$db));
+	my $site_url = $ce->{webworkURLs}->{htdocs};
+	print CGI::start_script({type=>"text/javascript", src=>"$site_url/js/apps/MathPet/jQueryRotate.js"}), CGI::end_script();	
+	print CGI::start_script({type=>"text/javascript", src=>"$site_url/js/apps/MathPet/mathpet.js"}), CGI::end_script();	
+	print CGI::script({type=>"text/javascript"},WeBWorK::MathPet::getPetData($user,$ce,$db));
     }
 
     return "";

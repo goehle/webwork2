@@ -295,9 +295,9 @@ var tabberOptions = {manualStartup:true};
 <!--#endif-->
 		
 <!--#if can="output_math_pet"-->
-<div class="row-fluid"><div id="math-pet" class="span8">
+<div class="row-fluid"><div id="math-pet" class="span10" style="height:400px">
 	<!--#output_math_pet-->
-</div><div class="span4"></div></div>
+</div><div class="span2"></div></div>
 <!--#endif-->
 
 </div><!--content-->

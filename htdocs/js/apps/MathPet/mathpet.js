@@ -1,14 +1,14 @@
-function mathPet(score,imgurl)
+
+function MathPet(input)
 {
-    this.score = score;
-    this.url = imgurl;
+    this.percentComplete = input.percentComplete;
+    this.idle = new Array();
     this.petdiv = $('#math-pet');
     this.minleft = this.petdiv.offset().left;
     this.mintop = this.petdiv.offset().top;
     this.maxleft = this.petdiv.width()+ this.minleft;
     this.maxtop = this.petdiv.height() + this.mintop;
     var self = this;
-
 
     // This is needed so that the same object is used across setInterval calls
     function callAnimate() {
@@ -17,7 +17,8 @@ function mathPet(score,imgurl)
 
     this.initiate = function()
     {
-	this.petdiv.append('<img id="math-pet-img" alt="MathPet" src="'+imgurl+'" />');
+	this.petdiv.append('<img id="math-pet-img" alt="MathPet" src="'
+			   +this.waitingAnimation+'" />');
 	this.pet = $('#math-pet-img');
 
 	this.pet.height('50px');
@@ -60,7 +61,8 @@ function mathPet(score,imgurl)
 	    
 	} else {
 
-	    this.wander();
+	    var i = Math.floor((Math.random()*this.idle.length));
+	    this.idle[i](this);
 
 	}
 	
@@ -72,7 +74,8 @@ function mathPet(score,imgurl)
 
     }
 
-    this.wander = function() {
+    this.idle.push(function(self) {
+	
 	var xdir;
 	var ydir;
 	var speed = 150; 
@@ -86,15 +89,32 @@ function mathPet(score,imgurl)
 	    do {
 		xdir = 2*(Math.random()-.5);
 		ydir = 2*(Math.random()-.5);
-		newpetleft = speed*xdir + this.petleft;
-		newpettop = speed*ydir + this.pettop;
-	    } while (newpetleft > this.maxleft ||
-		     newpetleft < this.minleft ||
-		     newpettop > this.maxtop ||
-		     newpettop < this.mintop);
+		newpetleft = speed*xdir + self.petleft;
+		newpettop = speed*ydir + self.pettop;
+	    } while (newpetleft > self.maxleft ||
+		     newpetleft < self.minleft ||
+		     newpettop > self.maxtop ||
+		     newpettop < self.mintop);
 
-	    this.pet.animate({'left':newpetleft+'px','top':newpettop+'px'},3000);
+	    self.pet.animate({'left':newpetleft+'px','top':newpettop+'px'},3000);
 	    i++;
 	}
-    }
-}
+    });
+};
+
+Derpy.prototype = Object.create(MathPet.prototype);
+Derpy.prototype.constructor = Derpy;
+
+function Derpy (input) {
+
+    MathPet.call(this,input);
+    this.waitingAnimation = input.mathPetURLimg+'/sprite_derpy.gif';
+    this.idle.push( function(self) {
+	self.pet.rotate({angle:0,animateTo:360});
+
+    });
+
+    
+
+};
+

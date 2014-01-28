@@ -39,14 +39,25 @@ sub getPetData {
 		$globalData = thaw($globalUserAchievement->frozen_hash);
     }
 
-    my $points = $globalUserAchievement->achievement_points;
-    my $url = $ce->{webworkURLs}->{htdocs}.'/js/apps/MathPet/img/sprite_derpy.gif';
+    my $percentComplete = $globalUserAchievement->achievement_points/
+	$globalUserAchievement->next_level_points;
+
+    my $petClass = "Derpy";
 
     my $script = <<EOS;     
-    var myPet = new mathPet($points,"$url");
-    myPet.initiate();
+    (function() {
+	
+	var parameters = {
+        'mathPetURL' : '$ce->{webworkURLs}->{htdocs}/js/apps/MathPet',
+	'mathPetURLimg' : '$ce->{webworkURLs}->{htdocs}/js/apps/MathPet/img',
+        'percentComplete' : $percentComplete,
+	};
+	/* create the pet using the appropriate class and initialize */ 
+	var myPet = new $petClass(parameters);
+	myPet.initiate();
+
+    }());
 EOS
-    ;
 	
     return $script;
 

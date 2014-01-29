@@ -20,7 +20,7 @@ sub updatePet {
     my $db = shift;
     my $globalData = shift;
 
-    $globalData->{'thingie'} = 2;
+    $globalData->{'petClass'} = 'Derpy';
 
 }
 
@@ -30,7 +30,6 @@ sub getPetScript {
     my $db = shift;
     my $site_url = $ce->{webworkURLs}->{htdocs};
 
-    
     my $globalUserAchievement = $db->getGlobalUserAchievement($userName);
 
     return "" unless $globalUserAchievement;
@@ -41,11 +40,20 @@ sub getPetScript {
 		$globalData = thaw($globalUserAchievement->frozen_hash);
     }
 
-    my $percentComplete = $globalUserAchievement->achievement_points/
-	$globalUserAchievement->next_level_points;
+    my $percentComplete = 0;
+    if ($globalUserAchievement->next_level_points) {
+	$percentComplete = $globalUserAchievement->achievement_points/
+	    $globalUserAchievement->next_level_points;
+    }
 
-    my $petClass = "Derpy";
 
+    my $earnedLevel = $globalData->{earnedLevel} ? 1 : 0;
+    my $earnedAchievement = $globalData->{earnedAchievement} ? 1 : 0;
+    my $completedProblem = $globalData->{completedProblem} ? 1 : 0;
+    my $completedSet =  $globalData->{completedSet} ? 1 : 0;
+    my $sadPet =  $globalData->{incorrectStreak} > 10 ? 1 : 0;
+
+    
     my $script = <<EOS;     
     <script type="text/javascript" src="$site_url/js/apps/MathPet/mathpet.js"></script>
     <script type="text/javascript">
@@ -56,21 +64,21 @@ sub getPetScript {
 	'mathPetURLimg' : '$ce->{webworkURLs}->{htdocs}/js/apps/MathPet/img',
         'percentComplete' : $percentComplete,
 	'flags' : {
-	    'earnedLevel' : 0,
+	    'earnedLevel' : $earnedLevel,
 	    'earnedAchievement' : 1,
-	    'completedProblem' : 0,
-	    'completedSet' : 0,
-	    'sadPet' : 0,
+	    'completedProblem' : 1,
+	    'completedSet' : $completedSet,
+	    'sadPet' : $sadPet,
 	},
 	};
 	/* create the pet using the appropriate class and initialize */ 
-	var myPet = new $petClass(parameters);
+	var myPet = new $globalData->{petClass}(parameters);
 	myPet.initiate();
 
     }());
     </script>
 EOS
-	
+
     return $script;
 
 }

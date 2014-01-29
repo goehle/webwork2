@@ -117,6 +117,8 @@ function MathPet(input)
     
     this.defaultCheer = function() {
 	this.pet.attr('src',self.imgPath+'/cheer.gif');
+	this.pet.offset({'top':250,
+			 'left':$( document ).width()/2});
 	this.animationLength = 10000;
     }
     
@@ -175,6 +177,8 @@ function Derpy (input) {
     /* this overrides the achievement cheer */
     this.achievementCheer = function () {
 	this.pet.attr('src',self.imgPath+'/muffin.gif');
+	this.pet.offset({'top':250,
+			 'left':$( document ).width()/2});
 	this.animationLength = 6000;
     }    
     

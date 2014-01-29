@@ -94,6 +94,12 @@ sub checkForAchievements {
 		$globalData = thaw($globalUserAchievement->frozen_hash);
     }
 
+    #reset the flags in globalData
+    $globalData->{completedProblem} = 0;
+    $globalData->{completedSet} = 0;
+    $globalData->{earnedAchievement} = 0;
+    $globalData->{earnedLevel} = 0;
+
     #Update a couple of "standard" variables in globalData hash.
     my $allcorrect = 0;
     if ($problem->status == 1 && $problem->num_correct == 1) {
@@ -103,8 +109,18 @@ sub checkForAchievements {
 	#this variable is shared and should be considered iffy
 		$achievementPoints += $ce->{achievementPointsPerProblem};
 		$globalData->{'completeProblems'} += 1;
+		$globalData->{'completedProblem'} = 1;
+		$globalData->{'incorrectStreak'} = 0;
 		$allcorrect = 1;
+    } elsif ($problem->status != 1 && $problem->num_correct == 0) {
+	# keeps track of the incorrect answer streak for MathPets.  
+	if ($globalData->{'incorrectStreak'}) {
+	    $globalData->{'incorrectStreak'}++;
+	} else {
+	    $globalData->{'incorrectStreak'} = 1;
+	}
     }
+
 
     our @setProblems = $db->getAllUserProblems( $user_id, $problem->set_id);
     
@@ -122,6 +138,7 @@ sub checkForAchievements {
     
     if ($allcorrect) {
 	$globalData->{'completeSets'}++;
+	$globalData->{completedSet} = 1;
     }
 
     # get the problem tags
@@ -192,10 +209,12 @@ sub checkForAchievements {
 	#if we have a new achievement then update achievement points
 	if ($earned) {
 	    $userAchievement->earned(1);
-	
+	    $globalData->{earnedAchievement} = 1;
+
 	    if ($achievement->category eq 'level') {
-			$globalUserAchievement->level_achievement_id($achievement_id);
-			$globalUserAchievement->next_level_points($nextLevelPoints);
+		$globalData->{earnedLevel} = 1;
+		$globalUserAchievement->level_achievement_id($achievement_id);
+		$globalUserAchievement->next_level_points($nextLevelPoints);
 	    }
 
 	    #build the cheevo message. New level messages are slightly different

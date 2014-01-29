@@ -3,7 +3,8 @@ function MathPet(input)
 {
     this.percentComplete = input.percentComplete;
     this.flags = input.flags;
-    this.idle = new Array();
+    this.idles = new Array();
+    this.clicks = new Array();
     this.imgPath = input.mathPetURLimg+'/'+this.className;
     this.petdiv = $('#math-pet');
     this.minleft = this.petdiv.offset().left;
@@ -35,11 +36,43 @@ function MathPet(input)
 	this.pettop = (this.maxtop+3*this.mintop)/4;
 	this.pet.offset({'left':this.petleft,'top':this.pettop});
 
+	this.lastidle = -1;
+	this.lastclick = -1;
+
+	this.pet.click(function () {
+	    
+	    clearInterval(self.animateTimer);
+	    
+	    var i;
+
+	    do {
+		i = Math.floor((Math.random()*self.clicks.length));
+	    } while (i == self.lastclick);
+
+	    self.lastclick = i;
+	    self.clicks[i](self);
+	    
+	    self.animateTimer = setTimeout(callAnimate,
+					   self.animationLength);
+	
+	});
+	
+	this.pet.draggable({
+	    start: function() {
+		clearInterval(self.animateTimer);
+		self.pet.stop();
+		self.pet.attr('src',self.imgPath+'/drag.gif');
+	    },
+	    stop: function() {
+		self.animate();
+	    },
+	});		
+	
 	//Get things started then go into a loop
 	this.animate();
-
+	
     }
-
+    
     this.animate = function() {
 
 	if (this.flags.earnedLevel) {
@@ -68,32 +101,43 @@ function MathPet(input)
 	    this.sadAnimation();
 	} else {
 
-	    var i = Math.floor((Math.random()*this.idle.length));
-	    this.idle[i](this);
+	    var i;
+	    do {
+		i = Math.floor((Math.random()*this.idles.length));
+	    } while (i == this.lastidle);
+
+	    this.lastidle=i;
+	    this.idles[i](this);
 
 	}
 
-	setTimeout(callAnimate,this.animationLength);
+	this.animateTimer = setTimeout(callAnimate,
+					   this.animationLength);
     }
-
+    
     this.defaultCheer = function() {
 	this.pet.attr('src',self.imgPath+'/cheer.gif');
 	this.animationLength = 10000;
     }
-
+    
     this.achievementCheer = this.defaultCheer;
     this.completedProblemCheer = this.defaultCheer;
     this.completedSetCheer = this.defaultCheer;
-
-
+    
+    
+    this.sadAnimation = function() {
+	this.pet.attr('src',self.imgPath+'/sad.gif');
+	this.animationlength = 10000;
+    }
+    
     /* This is a standing idle animation */
-    this.idle.push(function(self) {
+    this.idles.push(function(self) {
 	self.pet.attr('src',self.imgPath+'/idle.gif');
-	self.animationLength = 4000;
+	self.animationLength = 12000;
     });
     
     /* This is a walking around animation */
-    this.idle.push(function(self) {
+    this.idles.push(function(self) {
 	
 	var length = 3000;
 	var newpetleft;
@@ -109,11 +153,13 @@ function MathPet(input)
 			 {'duration' : length});
 	self.animationLength = length;
     });
+
+    /* this is the default click animation */
+    this.clicks.push(function(self) {
+	self.pet.attr('src',self.imgPath+'/click.gif');
+	self.animationLength = 4000;
+    });
     
-    this.sadAnimation = function() {
-	this.pet.attr('src',self.imgPath+'/sad.gif');
-	this.animationlength = 10000;
-    }
 };
 
 Derpy.prototype = Object.create(MathPet.prototype);
@@ -123,20 +169,25 @@ function Derpy (input) {
     
     this.className = 'Derpy';
     MathPet.call(this,input);
-
+    
     var self = this;
-
-    /* this is another idle animation */
-    this.idle.push( function(self) {
-	self.pet.attr('src',self.imgPath+'/idle2.gif');
-	self.animationLength = 10000;
-    });
-
+    
     /* this overrides the achievement cheer */
     this.achievementCheer = function () {
 	this.pet.attr('src',self.imgPath+'/muffin.gif');
 	this.animationLength = 6000;
     }    
+    
+    /* this is another idle animation */
+    this.idles.push( function(self) {
+	self.pet.attr('src',self.imgPath+'/idle2.gif');
+	self.animationLength = 10000;
+    });
 
+    this.clicks.push(function(self) {
+	self.pet.attr('src',self.imgPath+'/click2.gif');
+	self.animationLength = 2000;
+    });
+		    
 };
 

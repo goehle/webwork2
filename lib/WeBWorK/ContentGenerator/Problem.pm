@@ -201,6 +201,22 @@ sub set_showOldAnswers_default {
 # output utilities
 ################################################################################
 
+sub if_can {
+	my ($self, $arg) = @_;
+	my $r = $self->r;
+	my $db = $r->db;
+	my $ce = $r->ce;
+	my $authz = $r->authz;
+	my $globalUserAchievement = $self->{globalData};
+
+	if ($arg eq 'output_math_pet' && (not $ce->{mathPetEnabled} || 
+	    not $ce->{achievementsEnabled})) {
+	    return 0;
+ 	} else {
+	    return $self->SUPER::if_can($arg);
+ 	}
+ }
+
 # Note: the substance of attemptResults is lifted into GatewayQuiz.pm,
 # with some changes to the output format
 

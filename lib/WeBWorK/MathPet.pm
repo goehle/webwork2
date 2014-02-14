@@ -66,13 +66,13 @@ sub getPetScript {
 	'flags' : {
 	    'earnedLevel' : $earnedLevel,
 	    'earnedAchievement' : 1,
-	    'completedProblem' : 1,
+	    'completedProblem' : $completedProblem,
 	    'completedSet' : $completedSet,
 	    'sadPet' : $sadPet,
 	},
 	};
 	/* create the pet using the appropriate class and initialize */ 
-	var myPet = new $globalData->{petClass}(parameters);
+	var myPet = MathPets('$globalData->{petClass}',parameters);
 	myPet.initiate();
 
     }());

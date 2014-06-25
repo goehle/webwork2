@@ -96,8 +96,8 @@ use constant EDIT_FORMS => [qw(saveEdit cancelEdit)];
 use constant VIEW_FORMS => [qw(filter sort edit publish import export score create delete)];
 use constant EXPORT_FORMS => [qw(saveExport cancelExport)];
 
-use constant VIEW_FIELD_ORDER => [ qw( set_id problems users visible hide_hint enable_reduced_scoring open_date due_date answer_date) ];
-use constant EDIT_FIELD_ORDER => [ qw( set_id visible hide_hint enable_reduced_scoring open_date due_date answer_date) ];
+use constant VIEW_FIELD_ORDER => [ qw( set_id problems users visible enable_reduced_scoring open_date due_date answer_date) ];
+use constant EDIT_FIELD_ORDER => [ qw( set_id visible enable_reduced_scoring open_date due_date answer_date) ];
 use constant EXPORT_FIELD_ORDER => [ qw( select set_id filename) ];
 
 # permissions needed to perform a given action
@@ -244,11 +244,11 @@ use constant  FIELD_PROPERTIES => {
 		size => 10,
 		access => "readwrite",
 	},
-	hide_hint => {
-		type => "checked",
-		size => 4,
-		access => "readwrite",
-	}
+#	hide_hint => {
+#		type => "checked",
+#		size => 4,
+#		access => "readwrite",
+#	}
 };
 
 sub pre_header_initialize {
@@ -455,10 +455,10 @@ sub body {
 		$r->maketext("Due Date"), 
 		$r->maketext("Answer Date"), 
 		$r->maketext("Visible"),
-	    # Reduced Credit Enabled made the column wider than it needed
+	    # Reduced Scoring Enabled made the column wider than it needed
 	    # to be...
-	    #   $r->maketext("Reduced Credit Enabled"), 
-	        $r->maketext("Reduced Credit"), 
+	    #   $r->maketext("Reduced Scoring Enabled"), 
+	        $r->maketext("Reduced Scoring"), 
 		$r->maketext("Hide Hints") 
 	);
 	
@@ -588,29 +588,13 @@ sub body {
 		CGI::div({-class=>"tabbertab"},$divArrRef)
 		);
 	
-	my $selectAll =WeBWorK::CGI_labeled_input(-type=>'button', -id=>"select_all", -input_attr=>{-name=>'check_all', -value=>$r->maketext('Select all sets'),
-	       onClick => "for (i in document.problemsetlist.elements)  { 
-	                       if (document.problemsetlist.elements[i].name =='selected_sets') { 
-	                           document.problemsetlist.elements[i].checked = true
-	                       }
-	                    }" });
-   	my $selectNone =WeBWorK::CGI_labeled_input(-type=>'button', -id=>"select_none", -input_attr=>{-name=>'check_none', -value=>$r->maketext('Unselect all sets'),
-	       onClick => "for (i in document.problemsetlist.elements)  { 
-	                       if (document.problemsetlist.elements[i].name =='selected_sets') { 
-	                          document.problemsetlist.elements[i].checked = false
-	                       }
-	                    }" });
-	unless ($editMode or $exportMode) {
-		print $selectAll." ". $selectNone;
-	}
-	print WeBWorK::CGI_labeled_input(-type=>"reset", -id=>"clear_entries", -input_attr=>{-value=>$r->maketext("Clear"), -class=>"button_input"});
 	print WeBWorK::CGI_labeled_input(-type=>"submit", -id=>"take_action", -input_attr=>{-value=>$r->maketext("Take Action!"), -class=>"button_input"}).CGI::br().CGI::br();
 
 	########## print table
 	
 	########## first adjust heading if in editMode
 	$prettyFieldNames{set_id} = $r->maketext("Edit Set") if $editMode;
-	$prettyFieldNames{enable_reduced_scoring} = $r->maketext('Enable Reduced Credit') if $editMode;
+	$prettyFieldNames{enable_reduced_scoring} = $r->maketext('Enable Reduced Scoring') if $editMode;
 	
 	
 	print CGI::p({},$r->maketext("Showing [_1] out of [_2] sets.", scalar @visibleSetIDs, scalar @allSetIDs));
@@ -772,7 +756,7 @@ sub sort_form {
 			-label_text=>$r->maketext("Sort by").": ",
 			-input_attr=>{
 				-name => "action.sort.primary",
-				-values => [qw(set_id set_header hardcopy_header open_date due_date answer_date visible)],
+				-values => [qw(set_id open_date due_date answer_date visible)],
 				-default => $actionParams{"action.sort.primary"}->[0] || "due_date",
 				-labels => {
 					set_id		=> $r->maketext("Set Name"),
@@ -1004,6 +988,7 @@ sub enable_reduced_scoring_handler {
 
 	my $r = $self->r;
 	my $db = $r->db;
+	my $ce = $r->ce;
 
 	my $result = "";
 	
@@ -1019,19 +1004,27 @@ sub enable_reduced_scoring_handler {
 		$result =  CGI::div({class=>"ResultsWithError"}, $r->maketext("No change made to any set"));
 	} elsif ($scope eq "all") {
 		@setIDs = @{ $self->{allSetIDs} };
-		$result = CGI::div({class=>"ResultsWithoutError"},$r->maketext("Reduced Credit [_1] for all sets", $verb));
+		$result = CGI::div({class=>"ResultsWithoutError"},$r->maketext("Reduced Scoring [_1] for all sets", $verb));
 	} elsif ($scope eq "visible") {
 		@setIDs = @{ $self->{visibleSetIDs} };
-		$result = CGI::div({class=>"ResultsWithoutError"},$r->maketext("Reduced Credit [_1] for visable sets", $verb));
+		$result = CGI::div({class=>"ResultsWithoutError"},$r->maketext("Reduced Scoring [_1] for visable sets", $verb));
 	} elsif ($scope eq "selected") {
 		@setIDs = @{ $genericParams->{selected_sets} };
-		$result = CGI::div({class=>"ResultsWithoutError"},$r->maketext("Reduced Credit [_1] for selected sets", $verb));
+		$result = CGI::div({class=>"ResultsWithoutError"},$r->maketext("Reduced Scoring [_1] for selected sets", $verb));
 	}
 	
 	# can we use UPDATE here, instead of fetch/change/store?
 	my @sets = $db->getGlobalSets(@setIDs);
 	
-	map { $_->enable_reduced_scoring("$value") if $_; $db->putGlobalSet($_); } @sets;
+	foreach my $set (@sets) {
+	    next unless $set;
+	    $set->enable_reduced_scoring("$value");
+	    if ($value  && !$set->reduced_scoring_date) {
+		$set->reduced_scoring_date($set->due_date -
+					  60*$ce->{pg}{ansEvalDefaults}{reducedScoringPeriod});
+	    }
+	    $db->putGlobalSet($set);
+	}
 	
 	return $result
 	
@@ -1285,7 +1278,9 @@ sub import_form {
 				"document.getElementsByName('action.import.source')[0].multiple = (number > 1 ? true : false);",
 				"document.getElementsByName('action.import.name')[0].value = (number > 1 ? '(taken from filenames)' : '');",
 			);
-	my $datescript = <<EOS;
+	my $datescript = "";
+	if ($ce->{options}{useDateTimePicker}) {
+	    $datescript = <<EOS;
 \$('#import_date_shift').datetimepicker({
   showOn: "button",
   buttonText: "<i class='icon-calendar'></i>",
@@ -1296,6 +1291,7 @@ sub import_form {
   constrainInput: false, 
  });
 EOS
+	}
 
 	return join(" ",
 		WeBWorK::CGI_labeled_input(
@@ -1348,6 +1344,7 @@ EOS
 		      -input_attr=>{
 			  -name => "action.import.start.date",
 			  -size => "27",
+                          -value => $actionParams{"action.import.start.date"}->[0] || "",
 			  -onchange => $onChange,})),
 		CGI::br(),
 		($authz->hasPermissions($user, "assign_problem_sets")) 
@@ -1543,6 +1540,7 @@ sub saveEdit_handler {
 	my ($self, $genericParams, $actionParams, $tableParams) = @_;
 	my $r           = $self->r;
 	my $db          = $r->db;
+	my $ce          = $r->ce;
 	
 	my @visibleSetIDs = @{ $self->{visibleSetIDs} };
 	foreach my $setID (@visibleSetIDs) {
@@ -1555,8 +1553,17 @@ sub saveEdit_handler {
 			if (defined $tableParams->{$param}->[0]) {
 				if ($field =~ /_date/) {
 					$Set->$field($self->parseDateTime($tableParams->{$param}->[0]));
+				} elsif ($field eq 'enable_reduced_scoring') {
+				    #If we are enableing reduced scoring, make sure the reduced scoring date is set
+				    my $value = $tableParams->{$param}->[0];
+				    $Set->enable_reduced_scoring($value);
+				    if (!$Set->reduced_scoring_date) {
+					$Set->reduced_scoring_date($Set->due_date -
+								  60*$ce->{pg}{ansEvalDefaults}{reducedScoringPeriod});
+				    }
+
 				} else {
-					$Set->$field($tableParams->{$param}->[0]);
+				    $Set->$field($tableParams->{$param}->[0]);
 				}
 			}
 		}
@@ -1830,7 +1837,8 @@ sub importSetsFromDef {
 			  sourceFile => $rh_problem->{source_file},
 			  problemID => $freeProblemID++,
 			  value => $rh_problem->{value},
-			  maxAttempts => $rh_problem->{max_attempts});
+			  maxAttempts => $rh_problem->{max_attempts},
+			  showMeAnother => $rh_problem->{showMeAnother});
 		}
 
 
@@ -1867,6 +1875,7 @@ sub readSetDef {
 	my $filePath      = "$templateDir/$fileName";
 	my $value_default = $self->{ce}->{problemDefaults}->{value};
 	my $max_attempts_default = $self->{ce}->{problemDefaults}->{max_attempts};
+	my $showMeAnother = $self->{ce}->{problemDefaults}->{showMeAnother};
 
 	my $setName = '';
 	
@@ -2050,7 +2059,12 @@ sub readSetDef {
 			## anything left?
 			push(@line, $curr) if ( $curr );
 			
-			($name, $value, $attemptLimit, $continueFlag) = @line;
+            # read the line and only look for $showMeAnother if it has the correct number of entries
+            if(scalar(@line)==4){
+			    ($name, $value, $attemptLimit, $showMeAnother, $continueFlag) = @line;
+            } else {
+			    ($name, $value, $attemptLimit, $continueFlag) = @line;
+            }
 			#####################
 			#  clean up problem values
 			###########################
@@ -2066,6 +2080,7 @@ sub readSetDef {
 			push(@problemData, {source_file    => $name,
 			                    value          =>  $value,
 			                    max_attempts   =>, $attemptLimit,
+			                    showMeAnother  =>, $showMeAnother,
 			                    continuation   => $continueFlag 
 			                    });
 		}
@@ -2152,12 +2167,20 @@ SET:	foreach my $set (keys %filenames) {
 			my $source_file   = $problemRecord->source_file();
 			my $value         = $problemRecord->value();
 			my $max_attempts  = $problemRecord->max_attempts();
+			my $showMeAnother  = $problemRecord->showMeAnother();
 			
 			# backslash-escape commas in fields
 			$source_file =~ s/([,\\])/\\$1/g;
 			$value =~ s/([,\\])/\\$1/g;
 			$max_attempts =~ s/([,\\])/\\$1/g;
-			$problemList     .= "$source_file, $value, $max_attempts \n";
+			$showMeAnother =~ s/([,\\])/\\$1/g;
+
+            # only include showMeAnother if it has been enabled in the course configuration
+            if($ce->{pg}->{options}{enableShowMeAnother}){
+			    $problemList     .= "$source_file, $value, $max_attempts, $showMeAnother \n";
+            } else {
+			    $problemList     .= "$source_file, $value, $max_attempts \n";
+            }
 		}
 
 		# gateway fields
@@ -2364,7 +2387,7 @@ sub recordEditHTML {
 	my $setSelected = $options{setSelected};
 
 	my $visibleClass = $Set->visible ? $r->maketext("font-visible") : $r->maketext("font-hidden");
-	my $enable_reduced_scoringClass = $Set->enable_reduced_scoring ? $r->maketext('Reduced Credit Enabled') : $r->maketext('Reduced Credit Disabled');
+	my $enable_reduced_scoringClass = $Set->enable_reduced_scoring ? $r->maketext('Reduced Scoring Enabled') : $r->maketext('Reduced Scoring Disabled');
 
 	my $users = $db->countSetUsers($Set->set_id);
 	my $totalUsers = $self->{totalUsers};
@@ -2372,6 +2395,8 @@ sub recordEditHTML {
 	my $problems = $db->listGlobalProblems($Set->set_id);
 	
         my $usersAssignedToSetURL  = $self->systemLink($urlpath->new(type=>'instructor_users_assigned_to_set', args=>{courseID => $courseName, setID => $Set->set_id} ));
+	my $prettySetID = $Set->set_id;
+	$prettySetID =~ s/_/ /g;
 	my $problemListURL  = $self->systemLink($urlpath->new(type=>'instructor_set_detail', args=>{courseID => $courseName, setID => $Set->set_id} ));
 	my $problemSetListURL = $self->systemLink($urlpath->new(type=>'instructor_set_list2', args=>{courseID => $courseName, setID => $Set->set_id})) . "&editMode=1&visible_sets=" . $Set->set_id;
 	my $imageURL = $ce->{webworkURLs}->{htdocs}."/images/edit.gif";
@@ -2400,35 +2425,28 @@ sub recordEditHTML {
 	my $label_text="";
 	if ($editMode) {
 		# column not there
-		$label_text = CGI::a({href=>$problemListURL}, "$set_id");
+		$label_text = CGI::a({href=>$problemListURL}, $prettySetID);
 	} else {
 		# selection checkbox
 		# Set ID
 		my $label = "";
 		if ($editMode) {
-			$label = CGI::a({href=>$problemListURL}, "$set_id");
+			$label = CGI::a({href=>$problemListURL}, $prettySetID);
 		} else {		
-			$label = CGI::a({class=>"$visibleClass set-id-tooltip", "data-toggle"=>"tooltip", "data-placement"=>"right", title=>"", "data-original-title"=>$Set->description()}, $set_id) . $imageLink;
+			$label = CGI::a({class=>"set-label $visibleClass set-id-tooltip", "data-toggle"=>"tooltip", "data-placement"=>"right", title=>"", "data-original-title"=>$Set->description()}, $prettySetID) . $imageLink;
 		}
 		
-		push @tableCells, WeBWorK::CGI_labeled_input(
+		push @tableCells, CGI::input({
 			-type=>"checkbox",
 			-id=>$set_id."_id",
-			-label_text=>$label,
-			-input_attr=>$setSelected ?
-			{
-				-name => "selected_sets",
-				-value => $set_id,
-				-checked => "checked",
-				-class => "table_checkbox",
-			}
-			:
-			{
-				-name => "selected_sets",
-				-value => $set_id,
-				-class => "table_checkbox",
-			}
+			$setSelected ? ('checked','checked') : (),
+			-name => "selected_sets",
+			-value => $set_id,
+			-class => "table_checkbox",
+					     }
 		);
+
+		push @tableCells, CGI::div({class=>'label-with-edit-icon'},$label);
 	}
 
 	# Problems link
@@ -2458,6 +2476,11 @@ sub recordEditHTML {
 		@fieldsToShow = @{ VIEW_FIELD_ORDER() };
 	}
 	
+	# Remove the enable reduced scoring box if that feature isnt enabled
+	if (!$ce->{pg}{ansEvalDefaults}{enableReducedScoring}) {
+	    @fieldsToShow = grep {$_ ne 'enable_reduced_scoring'} @fieldsToShow;
+	}
+
 	# make a hash out of this so we can test membership easily
 	my %nonkeyfields; @nonkeyfields{$Set->NONKEYFIELDS} = ();
 	
@@ -2491,6 +2514,7 @@ sub recordEditHTML {
 sub printTableHTML {
 	my ($self, $SetsRef, $fieldNamesRef, %options) = @_;
 	my $r                       = $self->r;
+	my $ce = $r->ce;
 	my $authz                   = $r->authz;
 	my $user                    = $r->param('user');
 	my $setTemplate	            = $self->{setTemplate};
@@ -2519,6 +2543,12 @@ sub printTableHTML {
 	}
 
 	
+	# Remove the enable reduced scoring box if that feature isnt enabled
+	if (!$ce->{pg}{ansEvalDefaults}{enableReducedScoring}) {
+	    @realFieldNames = grep {$_ ne 'enable_reduced_scoring'} @realFieldNames;
+	}
+
+	
 	my %sortSubs = %{ SORT_SUBS() };
 
 	# FIXME: should this always presume to use the templates directory?
@@ -2540,14 +2570,22 @@ sub printTableHTML {
 
 
 	my @tableHeadings = map { $fieldNames{$_} } @realFieldNames;
-	#shift @tableHeadings;   # removed "select" so there is no need to shift headings -- checkbox occurs in column.
 	
+	my $selectBox = CGI::input({
+	    type=>'checkbox',
+	    id=>'setlist-select-all',
+	    onClick => "\$('input[name=\"selected_sets\"]').attr('checked',\$('#setlist-select-all').is(':checked'));"	
+				   });
+
+	if (!($editMode or $exportMode)) {
+	    unshift @tableHeadings, $selectBox;
+	}	
 
 	# print the table
 	if ($editMode or $exportMode) {
-		print CGI::start_table({-id=>"set_table_id", -class=>"set_table", -summary=>$r->maketext("_PROBLEM_SET_SUMMARY"). " This is a subset of all homework sets" });#"This is a table showing the current Homework sets for this class.  The fields from left to right are: Edit Set Data, Edit Problems, Edit Assigned Users, Visibility to students, Reduced Credit Enabled, Date it was opened, Date it is due, and the Date during which the answers are posted.  The Edit Set Data field contains checkboxes for selection and a link to the set data editing page.  The cells in the Edit Problems fields contain links which take you to a page where you can edit the containing problems, and the cells in the edit assigned users field contains links which take you to a page where you can edit what students the set is assigned to."});
+		print CGI::start_table({-id=>"set_table_id", -class=>"set_table", -summary=>$r->maketext("_PROBLEM_SET_SUMMARY"). " This is a subset of all homework sets" });#"This is a table showing the current Homework sets for this class.  The fields from left to right are: Edit Set Data, Edit Problems, Edit Assigned Users, Visibility to students, Reduced Scoring Enabled, Date it was opened, Date it is due, and the Date during which the answers are posted.  The Edit Set Data field contains checkboxes for selection and a link to the set data editing page.  The cells in the Edit Problems fields contain links which take you to a page where you can edit the containing problems, and the cells in the edit assigned users field contains links which take you to a page where you can edit what students the set is assigned to."});
 	} else {
-		print CGI::start_table({-id=>"set_table_id", -border=>1, -class=>"set_table", -summary=>$r->maketext("_PROBLEM_SET_SUMMARY") }); #"This is a table showing the current Homework sets for this class.  The fields from left to right are: Edit Set Data, Edit Problems, Edit Assigned Users, Visibility to students, Reduced Credit Enabled, Date it was opened, Date it is due, and the Date during which the answers are posted.  The Edit Set Data field contains checkboxes for selection and a link to the set data editing page.  The cells in the Edit Problems fields contain links which take you to a page where you can edit the containing problems, and the cells in the edit assigned users field contains links which take you to a page where you can edit what students the set is assigned to."});
+		print CGI::start_table({-id=>"set_table_id", -class=>"set_table", -summary=>$r->maketext("_PROBLEM_SET_SUMMARY") }); #"This is a table showing the current Homework sets for this class.  The fields from left to right are: Edit Set Data, Edit Problems, Edit Assigned Users, Visibility to students, Reduced Credit Enabled, Date it was opened, Date it is due, and the Date during which the answers are posted.  The Edit Set Data field contains checkboxes for selection and a link to the set data editing page.  The cells in the Edit Problems fields contain links which take you to a page where you can edit the containing problems, and the cells in the edit assigned users field contains links which take you to a page where you can edit what students the set is assigned to."});
 	}
 	
 	print CGI::caption($r->maketext("Set List"));

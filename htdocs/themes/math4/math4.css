@@ -103,6 +103,24 @@ ul.nav li a:hover {
         overflow: hidden;
 }
 
+#breadcrumb-row {
+    margin-top:1ex;
+}
+
+#toggle-sidebar {
+    float:left;
+    height:20px;
+    padding-top:8px;
+    padding-bottom:8px;
+}
+
+#breadcrumb-navigation {
+    float:left;
+    display:inline-block;
+    width:90%;
+    width:calc(100% - 35px);
+}
+
 /* Main Content */
 .body {
 	display: inline-block;
@@ -201,9 +219,17 @@ ul.courses-list a:hover {
 /* Classlist Editor */
 /* this table is a pain, it wants to be a certain width and it'll force you
  * to scroll if you don't have that width, don't know how to fix it */
+.label-with-edit-icon {
+    white-space:nowrap;
+}
+
+.label-with-edit-icon .set-label {
+    white-space:normal;
+}
+
 table.classlist-table {
 /*	display: block; */
-	max-width: 95%; /* prevent it from violating container-fluid's padding,
+        max-width: 95%; /* prevent it from violating container-fluid's padding,
 					 only valid in a rare edge case */
 }
 
@@ -213,7 +239,11 @@ table.classlist-table .tbody {
 
 /* Homework Sets */
 .problem_set_body input[type='checkbox'], .problem_set_body input[type='radio'] {
-	margin: 0.5em; /* keep the assignment buttons from crowding chkbox */
+    margin-top: 0px;
+}
+
+.problem_set_table td a {
+    font-weight:bold;
 }
 
 /* Info Box */
@@ -360,22 +390,23 @@ div.AuthorComment { background-color: #00E0E0; color: black; }
 /*ul.LinksMenu ul { list-style: none; margin-left: 0.5em; padding-left: 0; }*/
 
 /* background styles for success and failure messages */
-div.WarningMessage { background-color: #FF9494; padding: 3px 3px 3px 3px; }
+div.WarningMessage { background-color: #FF9494; padding: 3px 3px 3px 3px; } /* error red, from http://www.colourlovers.com/color/FF9494/error_red*/
 div.ResultsWithoutError { color: inherit; background-color: #8F8; } /* green */
 div.ResultsWithError { color: #FF9494; background-color: inherit; } /* error red, from http://www.colourlovers.com/color/FF9494/error_red*/
 div.ResultsAlert { color: #F60; background-color: inherit; } /* orange */
-label.WarningMessage { background-color: #FF9494; padding: 3px 3px 3px 3px; }
+div.showMeAnotherBox { background-color: #EDE275; border-radius: 5px; border: 2px solid #FDD017; padding: 3px 3px 3px 3px} /* bright gold border and harvest gold background*/
+label.WarningMessage { background-color: #FF9494; padding: 3px 3px 3px 3px; } /* error red, from http://www.colourlovers.com/color/FF9494/error_red*/
 label.ResultsWithoutError { color: inherit; background-color: #8F8; } /* green */
 label.ResultsWithError { color: #FF9494; background-color: inherit; } /* error red, from http://www.colourlovers.com/color/FF9494/error_red*/
 label.ResultsAlert { color: #F60; background-color: inherit; } /* orange */
-span.WarningMessage { background-color: #FF9494; padding: 3px 3px 3px 3px; }
+span.WarningMessage { background-color: #FF9494; padding: 3px 3px 3px 3px; } /* error red, from http://www.colourlovers.com/color/FF9494/error_red*/
 span.ResultsWithoutError { color: inherit; background-color: #8F8; } /* green */
 span.ResultsWithError { color: #FF9494; background-color: inherit; } /* error red, from http://www.colourlovers.com/color/FF9494/error_red*/
 span.ResultsAlert { color: #F60; background-color: inherit; } /* orange */
 span.correct { color: inherit; background-color: #8F8; } /* green */
 span.incorrect { color: #FF9494; background-color: inherit; } /* red */
 span.unattempted { color: inherit; background-color: #88ECFF;}
-input.correct   { color:inherit; background-color: #8F8; } /* green */
+input.correct { color:inherit; background-color: #8F8; } /* green */
 input.incorrect { color:inherit; background-color: #FF9494; } /* red */
 
 .results-popover {
@@ -420,6 +451,7 @@ table.attemptResults th {
 	border-style: inset; 
 	border-width: 1px; 
 	text-align: center; 
+	vertical-align: middle;
 	/*width: 15ex;*/ /* this was erroniously commented out with "#" */
 	padding: 2px 5px 2px 5px;
 	color: inherit;
@@ -429,6 +461,11 @@ table.attemptResults th {
 .attemptResults .popover {
     max-width: 100%;
 }
+
+table.attemptResults td.FeedbackMessage { background-color:#EDE275;} /* Harvest Gold */
+table.attemptResults td.ResultsWithoutError { background-color:#8F8;}
+span.ResultsWithErrorInResultsTable { color: inherit; background-color: inherit; } /* used to override the older red on white span */ 
+table.attemptResults td.ResultsWithError { background-color:#FF9494; color: #000000} /* error red */
 
 /*styles for the instructor comment box */
 
@@ -766,6 +803,12 @@ div.problem_sets_options {
     color: #000000;
 }
 
+
+.ScrollingRecordList > input[type='submit'] {
+    margin-top: 1ex;
+    margin-bottom: 2ex;
+}
+
 /*This is the styling specifically for the tables of problems displayed for each problem set page*/
 /*BUG FIXES*/
 
@@ -801,7 +844,7 @@ table#grades_table pre{
 }
 
 #mainform i.icon-random {
-    cursor: hand;
+    cursor: pointer;
 }
 
 #send-mail-form input,
@@ -824,9 +867,8 @@ table#grades_table pre{
     height:auto;
 }
 
-#problem_set_form .btn {
-    margin-left:.5ex;
-    margin-right:.5ex;
+#problem_set_form input[type="submit"] {
+    margin-right:1ex;
 } 
 
 #mainform .btn,

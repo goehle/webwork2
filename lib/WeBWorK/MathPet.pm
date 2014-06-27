@@ -72,7 +72,7 @@ sub getPetScript {
 	},
 	};
 	/* create the pet using the appropriate class and initialize */ 
-	var myPet = MathPets('$globalData->{petClass}',parameters);
+	var myPet = MathPets('WyvernA',parameters);
 	myPet.initiate();
 
     }());

@@ -40,11 +40,12 @@ var MathPets = function (petName,inputParams) {
 					      'length' : 0 },
 			   'setCheer' : { 'img' : 'setCheer.gif',
 					  'length' : 0 },
-			   'achievementCheer' : { 'img' : 'achievmentCheer.gif',
+			   'achievementCheer' : { 'img' : 'achievementCheer.gif',
 						  'length' : 0 },
 			   'levelUp' : { 'img' : 'levelUp.gif',
 					 'length' : 0 }
 			  }
+
 	var self = this;
 	
 	// This is needed so that the same object is used across
@@ -56,12 +57,26 @@ var MathPets = function (petName,inputParams) {
 	// Initiator function
 	this.initiate = function()
 	{
+
+	    // Preload the images
+	    $.each(this.animations, function (key, data) {
+		self.animations[key].elem = $('<img/>',{
+		    class: 'math-pet-img',
+		    alt: 'MathPet', 
+		    style: 'height:100%',
+		    src:self.imgPath+'/'+data.img});
+	    });
+
 	    // Set up the petdiv with the pet
-	    this.petdiv.append('<img id="math-pet-img" alt="MathPet" src="'
-			       +this.imgPath+'/idle1.gif" />');
+	    this.petdiv.append($('<div/>',{id : 'math-pet-img'}));
 	    this.pet = $('#math-pet-img');
+	    this.pet.html(this.animations.idle1.elem);
 	    this.pet.css('position','absolute');
-	    this.pet.height(100);
+	    this.pet.css('user-select','none');
+	    this.pet.height('150');
+	    this.pet.on('dragstart',function (event) { 
+		event.preventDefault(); 
+	    });
 	    
 	    // set new boundaries
 	    this.maxleft -= this.pet.width();
@@ -95,7 +110,7 @@ var MathPets = function (petName,inputParams) {
 		self.clicks[i](self);
 		
 		self.animateTimer = setTimeout(callAnimate,
-					       self.animationLength);
+					       self.animationLength*2000);
 		
 	    });
 	    
@@ -149,51 +164,45 @@ var MathPets = function (petName,inputParams) {
 	    }
 	    
 	    this.animateTimer = setTimeout(callAnimate,
-					   this.animationLength);
+					   this.animationLength*2000);
 	}
 	
 	// cheer and sad functions for flag animations
 	this.problemCheer = function() {
-	    this.pet.attr('src',self.imgPath+'/'+
-			 self.animations.problemCheer.img);
+	    this.pet.html(this.animations.problemCheer.elem);
 	    this.pet.offset({'top':250,
 			     'left':$( document ).width()/2});
 	    this.animationLength = self.animations.problemCheer.length;
 	}
 
 	this.setCheer = function() {
-	    this.pet.attr('src',self.imgPath+'/'+
-			 self.animations.setCheer.img);
+	    this.pet.html(this.animations.setCheer.elem);
 	    this.pet.offset({'top':250,
 			     'left':$( document ).width()/2});
 	    this.animationLength = self.animations.setCheer.length;
 	}
 
 	this.achievementCheer = function() {
-	    this.pet.attr('src',self.imgPath+'/'+
-			 self.animations.achievementCheer.img);
+	    this.pet.html(this.animations.achievementCheer.elem);
 	    this.pet.offset({'top':250,
 			     'left':$( document ).width()/2});
 	    this.animationLength = self.animations.achievementCheer.length;
 	}
 	
 	this.sadAnimation = function() {
-	    this.pet.attr('src',self.imgPath+'/'+
-			 self.animations.sad.img);
+	    this.pet.html(this.animations.sad.elem);
 	    this.animationLength = self.animations.sad.length;
 	}
 	
 	/* These are default standing idle animations */
 	this.idles.push(function(self) {
-	    this.pet.attr('src',self.imgPath+'/'+
-			 self.animations.idle1.img);
-	    this.animationLength = self.animations.idle1.length;
+	    self.pet.html(self.animations.idle1.elem);
+	    self.animationLength = self.animations.idle1.length;
 	});
 
 	this.idles.push(function(self) {
-	    this.pet.attr('src',self.imgPath+'/'+
-			 self.animations.idle2.img);
-	    this.animationLength = self.animations.idle2.length;
+	    self.pet.html(self.animations.idle2.elem);
+	    self.animationLength = self.animations.idle2.length;
 	});
 	
 	/* This is a walking around animation */
@@ -203,28 +212,45 @@ var MathPets = function (petName,inputParams) {
 	    var newpetleft;
 	    var newpettop;
 	    
-	    self.pet.attr('src',self.imgPath+'/'+
-			 self.animations.move.img);
-	    
-	    newpetleft = Math.random()*(self.maxleft-self.minleft) + 
-		self.minleft;
-	    newpettop = Math.random()*(self.maxtop-self.mintop) + 
+	    self.pet.html(self.animations.move.elem);
+	    newpetleft = (Math.random()/2 + .5)*(self.maxleft-self.minleft) 
+		+ self.minleft;
+	    newpettop = (Math.random()/2 + .5)*(self.maxtop-self.mintop) + 
 		self.mintop;
+
+	    if (self.pet.offset().left < newpetleft) {
+		self.pet.children('img').css({
+		    '-moz-transform': 'scaleX(-1)',
+		    '-o-transform': 'scaleX(-1)',
+		    '-webkit-transform': 'scaleX(-1)',
+		    'transform': 'scaleX(-1)',
+		    'filter': 'FlipH',
+		    '-ms-filter': 'FlipH',
+		});
+	    } else {
+		self.pet.children('img').css({
+		    '-moz-transform': 'scaleX(1)',
+		    '-o-transform': 'scaleX(1)',
+		    '-webkit-transform': 'scaleX(1)',
+		    'transform': 'scaleX(1)',
+		    'filter': 'none',
+		    '-ms-filter': 'none',
+		});
+	    }
+
 	    self.pet.animate({'left':newpetleft+'px','top':newpettop+'px'},
-			     {'duration' : length});
+			     {'duration' : length*2000});
 	    self.animationLength = length;
 	});
 	
 	/* these are the default click animations */
 	this.clicks.push(function(self) {
-	    self.pet.attr('src',self.imgPath+'/'+
-			 self.animations.click1.img);
+	    self.pet.html(self.animations.click1.elem);
 	    self.animationLength = self.animations.click1.length;
 	});
 	
 	this.clicks.push(function(self) {
-	    self.pet.attr('src',self.imgPath+'/'+
-			  self.animations.click2.img);
+	    self.pet.html(self.animations.click2.elem);
 	    self.animationLength = self.animations.click2.length;
 	});
 	
@@ -381,32 +407,45 @@ var MathPets = function (petName,inputParams) {
 	var self = this;
 
 	// Define the animation lengths
-	this.animations.move.length = 0;
-	this.animations.click1.length = 0;
-	this.animations.click2.length = 0;
-	this.animations.idle1.length = 0;
-	this.animations.idle2.length = 0;
-	this.animations.sad.length = 0;
-	this.animations.problemCheer.length = 0;
-	this.animations.setCheer.length = 0;
-	this.animations.achievementCheer.length = 0;
+	this.animations.move.length = 4.77;
+	this.animations.click1.length = 1.68;
+	this.animations.click2.length = 2.70;
+	this.animations.idle1.length = 3.30;
+	this.animations.idle2.length = 3.15;
+	this.animations.sad.length = 2.40;
+	this.animations.problemCheer.length = 2.55;
+	this.animations.setCheer.length = 3.78;
+	this.animations.achievementCheer.length = 3.78;
 	this.animations.levelUp.length = 0;
 
+	$.extend(this.animations,{
+	    'click3' : { 'img' : 'click3.gif',
+			 'length' : 1.95 },
+	    'click4' : { 'img' : 'click4.gif',
+			 'length' : 2.70 },
+	    'click5' : { 'img' : 'click5.gif',
+			 'length' : 4.05 },
+	    'idle3' : { 'img' : 'idle3.gif',
+			'length' : 1.65 },
+	    'idle4' : { 'img' : 'idle4.gif',
+			'length' : 5.64 },
+	});
+	    
 	// Adds another click animation
 	this.clicks.push(function(self) {
-	    self.pet.attr('src',self.imgPath+'/click3.gif');
-	    self.animationLength = 0;
+	    self.pet.html(self.animations.click3.elem);
+	    self.animationLength = self.animations.click3.length;
 	});
 
 	// Adds two click animations, one of which only happens very 
 	// rarely. 
 	this.clicks.push(function(self) {
 	    if (Math.random() < .90) {
-		self.pet.attr('src',self.imgPath+'/click4.gif');
-		self.animationLength = 0;
+		self.pet.html(self.animations.click4.elem);
+		self.animationLength = self.animations.click4.length;
 	    } else {
-		self.pet.attr('src',self.imgPath+'/click5.gif');
-		self.animationLength = 0;
+		self.pet.html(self.animations.click5.elem);
+		self.animationLength = self.animations.click5.length;
 	    }
 	});
 	
@@ -414,11 +453,11 @@ var MathPets = function (petName,inputParams) {
 	// rarely
 	this.idles.push(function(self) {
 	    if (Math.random() < .90) {
-		self.pet.attr('src',self.imgPath+'/idle3.gif');
-		self.animationLength = 0;
+		self.pet.html(self.animations.idle3.elem);
+		self.animationLength = self.animations.idle3.length;
 	    } else {
-		self.pet.attr('src',self.imgPath+'/idle4.gif');
-		self.animationLength = 0;
+		self.pet.html(self.animations.idle4.elem);
+		self.animationLength = self.animations.idle4.length;
 	    }
 	});
 

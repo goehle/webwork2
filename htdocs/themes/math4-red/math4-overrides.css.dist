@@ -34,18 +34,18 @@
 
 /* Color for links and link hover */
 a {
-  color: #003388;
+  color: #800000;
 }
 
 a:hover,
 a:focus {
-  color: #0088CC;
+  color: #CA7373;
 }
 
-/* Color for the dark blue buttons */
+/* Color for the dark red buttons */
 .btn-primary {
   color: #ffffff;
-  background-color: #003388;
+  background-color: #800000;
   background-image: none;
 }
 
@@ -56,13 +56,13 @@ a:focus {
 .btn-primary.disabled,
 .btn-primary[disabled] {
   color: #ffffff;
-  background-color: #003388;
+  background-color: #A00000;
 }
 
-/* Colors for the light blue buttons */
+/* Colors for the light red buttons */
 .btn-info {
   color: #ffffff;
-  background-color: #0088CC;
+  background-color: #CA7373;
   background-image: none;
 }
 .btn-info:hover,
@@ -72,19 +72,24 @@ a:focus {
 .btn-info.disabled,
 .btn-info[disabled] {
   color: #ffffff;
-  background-color: #0088CC;
+  background-color: #CA7373;
 }
 
 /* colors for the masthead */
 #masthead {
-    background-color: #003388;
+    background-color: #800000;
 }
 
 /* Color for the background of the webwork logo */
 .webwork_logo {
-    background-color: #003388;
-    border-color: #003388;
+    background-color: #800000;
+    border-color: #800000;
 }
+
+.maa_logo {
+    background-color: blue;
+    border: none;
+} 
 
 #masthead a {
     color: white;
@@ -100,51 +105,51 @@ a:focus {
 
 /* colors for the left hand nav list */
 #site-links ul {
-	border: 1px solid #e6e6e6;
-	background: #f6f6f6;
+    border: 1px solid #e6e6e6;
+    background: #f6f6f6;
 }
 
 .nav-list > .active > a,
 .nav-list > .active > a:hover,
 .nav-list > .active > a:focus {
     color: #ffffff;
-    background-color: #003388;
+    background-color: #800000;
 }
 
 ul.nav li a:hover {
-	background: #e1e1e1;	
+    background: #e1e1e1;    
 }
 
 /* The main title for each page */
 h2.page-title {
-	border-bottom: 1px solid #ccc;
+    border-bottom: 1px solid #ccc;
 }
 
 /* The breadcrumb nav */
 .breadcrumb {
-	border: 1px solid #e6e6e6;
+    border: 1px solid #e6e6e6;
 }
 
 /* The courses list coloring */
 ul.courses-list a {
-	border: 1px solid #e6e6e6;
-	background: #f6f6f6;
+    border: 1px solid #e6e6e6;
+    background: #f6f6f6;
 }
 
 ul.courses-list a:hover {
-	background: #003388;
-	color: white;
+    background: #800000;
+    color: white;
 }
 
 /* Info box (right hand box) coloring */
 .info-box {
-	border: 1px solid #e6e6e6;
-	background: #f6f6f6;
+    border: 1px solid #e6e6e6;
+    background: #f6f6f6;
 }
 
 .info-box h2, .info-box h3, .info-box h4, .info-box h5, .info-box h6 {
-	background: #003388;
-	color: white;
+    background: #800000;
+    color: white;
 }
 
 #InfoPanel {
@@ -235,7 +240,7 @@ span.correct {
     background-color: #88FF88; 
 }
 
-input.correct	{ 
+input.correct   { 
     color:inherit; 
     background-color: #88FF88; 
 } 
@@ -273,8 +278,8 @@ input.incorrect {
 
 /* Other formatting for attempt results and the problem page */
 table.attemptResults th {
-	color: inherit;
-	background-color: #DDDDDD;
+    color: inherit;
+    background-color: #DDDDDD;
 }
 
 span.ResultsWithErrorInResultsTable { 

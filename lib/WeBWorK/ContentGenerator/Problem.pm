@@ -430,7 +430,8 @@ sub previewAnswer {
 	
 	if ($displayMode eq "plainText") {
 		return $tex;
-	} elsif (($answerResult->{type}//'') eq 'essay') {
+	} elsif (($answerResult->{type}//'') eq 'essay' ||
+		 ($answerResult->{type}//'') eq 'string_literal') {
 	    return $tex;
 	} elsif ($displayMode eq "images") {
 		$imgGen->add($tex);

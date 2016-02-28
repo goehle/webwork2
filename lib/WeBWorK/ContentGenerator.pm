@@ -1055,7 +1055,6 @@ sub path {
  		    }
  		}
 	    }
-	    
 	    unshift @path, $name, $r->location . $urlpath->path;
 	} while ($urlpath = $urlpath->parent);
 	

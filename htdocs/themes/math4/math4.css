@@ -751,6 +751,10 @@ table.attemptResults th {
 	background-color: #DDDDDD;
 }
 
+table.attemptResults pre {
+    text-align: left;
+}
+
 .attemptResults .popover {
     max-width: 100%;
 }

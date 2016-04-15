@@ -16,18 +16,12 @@
 # Artistic License for more details.
 ################################################################################
 
-
-
 package WebworkWebservice::RenderProblem;
 use WebworkWebservice;
 use base qw(WebworkWebservice); 
 
-my $debugXmlCode=1;  # turns on the filter for debugging XMLRPC and SOAP code
+my $debugXmlCode=0;  # turns on the filter for debugging XMLRPC and SOAP code
 local(*DEBUGCODE);
-
-
-
-
 
 use strict;
 use sigtrap;
@@ -57,8 +51,6 @@ our $PROTOCOL     = $WebworkWebservice::PROTOCOL;
 our $HOST_NAME    = $WebworkWebservice::HOST_NAME;
 our $PORT         = $WebworkWebservice::HOST_PORT;
 our $HOSTURL      = "$PROTOCOL://$HOST_NAME:$PORT"; 
-
-
 
 
 our $UNIT_TESTS_ON =0;
@@ -117,8 +109,21 @@ use constant DISPLAY_MODE_FAILOVER => {
 sub renderProblem {
 	my $self = shift;
     my $rh = shift;
-    
+ 
+ # sanity check   
+	my $user_id      = $self->{user_id};
+	my $courseName   = $self->{courseName};
+	my $displayMode  = $rh->{envir}->{displayMode};
+	my $problemSeed  = $rh->{envir}->{problemSeed};
+	debug(WebworkWebservice::pretty_print_rh($rh));
 
+	unless ( $user_id && $courseName && $displayMode && defined($problemSeed)) {
+		die( "\n\n\nMissing essential data entering WebworkWebservice::RenderProblem::renderProblem: 
+		      userID: |$user_id|, courseName: |$courseName|,	
+		      displayMode: |$displayMode|, problemSeed: |$problemSeed|");
+		return;
+	}
+ 
 ###########################################
 # Grab the course name, if this request is going to depend on 
 # some course other than the default course
@@ -161,8 +166,12 @@ sub renderProblem {
 	warn "Unable to create course $courseName. Error: $@" if $@;
 	# my $user = $rh->{user};
 	# 	$user    = 'practice1' unless defined $user and $user =~/\S/;
-
-	my $user = $self->{user_id};
+	my $user;
+	if (defined $self->{user_id}) {
+		$user = $self->{user_id};
+	} else {
+		warn "RenderProblem.pm:  user_id is not defined userID is = ", $self->{userID};
+	}
 	
 ###########################################
 # Authenticate this request -- done by initiate  in WebworkWebservice 
@@ -191,14 +200,18 @@ sub renderProblem {
 
 ###########################################
 # Determine the method for accessing data   ???? what was this
+# these are not used -- but something like this was probably
+# meant to determine whether the problem source was being supplied
+# directly (as a kind of HERE document) or whether only the path to 
+# the problem source was being supplied
 ###########################################
-	my $problem_source_access    =   $rh->{problem_source_access};
+	# my $problem_source_access    =   $rh->{problem_source_access};
 	# One of
 	#	source_from_course_set_problem
 	#   source_from_source_file_path
 	#   source_from_request
 	
-	my $data_access              =   $rh->{data_access};
+	# my $data_access              =   $rh->{data_access};
 	# One of 
 	#   data_from_course
 	#   data_from_request
@@ -222,6 +235,7 @@ sub renderProblem {
 		print STDERR "RenderProblem.pm:  user = $user\n";
 		print STDERR "RenderProblem.pm:  courseName = $courseName\n";
 		print STDERR "RenderProblem.pm:  effectiveUserName = $effectiveUserName\n";
+		print STDERR "environment fileName", $rh->{envir}->{fileName},"\n";
 	}
 	
 	#################################################################
@@ -260,10 +274,12 @@ sub renderProblem {
 # data in the environment if necessary
 ###########################################
 	# determine the set name and the set problem number
-	my $setName       =  (defined($rh->{envir}->{setNumber}) )    ? $rh->{envir}->{setNumber}    : '';
+	my $setName       =  (defined($rh->{set_id}) ) ? $rh->{set_id} : 
+	    (defined($rh->{envir}->{setNumber}) ? $rh->{envir}->{setNumber}  : '');
+	
 	my $problemNumber =  (defined($rh->{envir}->{probNum})   )    ? $rh->{envir}->{probNum}      : 1 ;
 	my $problemSeed   =  (defined($rh->{envir}->{problemSeed}))   ? $rh->{envir}->{problemSeed}  : 1 ;
-	$problemSeed = $rh->{problemSeed} || $problemSeed;
+#	$problemSeed = $rh->{problemSeed} || $problemSeed;
 	my $psvn          =  (defined($rh->{envir}->{psvn})      )    ? $rh->{envir}->{psvn}         : 1234 ;
 	my $problemStatus =  $rh->{problem_state}->{recorded_score}|| 0 ;
 	my $problemValue  =  (defined($rh->{envir}->{problemValue}))   ? $rh->{envir}->{problemValue}  : 1 ;
@@ -352,7 +368,11 @@ sub renderProblem {
   		$problem_source =~ tr /\r/\n/;
 		$r_problem_source =\$problem_source;
 		# warn "source included in request";
-		$problemRecord->source_file($rh->{envir}->{fileName}) if defined $rh->{envir}->{fileName};
+		if (defined $rh->{envir}->{fileName} and not $rh->{envir}->{fileName}=~/WebworkClient.pm/)  {
+			$problemRecord->source_file($rh->{envir}->{fileName});
+		} else {
+			$problemRecord->source_file($rh->{sourceFilePath});
+		} 
   	} elsif (defined($rh->{sourceFilePath}) and $rh->{sourceFilePath} =~/\S/)  {
   	    $problemRecord->source_file($rh->{sourceFilePath});
   	    warn "reading source from ", $rh->{sourceFilePath} if $UNIT_TESTS_ON;
@@ -373,18 +393,21 @@ sub renderProblem {
 ##################################################
 # Other initializations
 ##################################################
+	#debug( "envir->displayMode", WebworkWebservice::pretty_print_rh($rh->{envir}));
 	my $translationOptions = {
-		displayMode     => $rh->{envir}->{displayMode},
+		displayMode     => $rh->{envir}->{displayMode}//"display mode not defined at RenderProblem.pm 388",
 		showHints	    => $rh->{envir}->{showHints},
 		showSolutions   => $rh->{envir}->{showSolutions},
  		refreshMath2img => $rh->{envir}->{showHints} || $rh->{envir}->{showSolutions},
- 		processAnswers  => 1,
+ 		processAnswers  => defined($rh->{processAnswers}) ? $rh->{processAnswers} : 1,
  		catchWarnings   => 1,
         # methods for supplying the source, 
         r_source        => $r_problem_source, # reference to a source file string.
         # if reference is not defined then the path is obtained 
         # from the problem object.
         permissionLevel => $rh->{envir}->{permissionLevel} || 0,
+		effectivePermissionLevel => $rh->{envir}->{effectivePermissionlevel} 
+		                            || $rh->{envir}->{permissionLevel} || 0,
 	};
 	
 	my $formFields = $rh->{envir}->{inputs_ref};
@@ -423,8 +446,8 @@ sub renderProblem {
 #       num_incorrect
 #   it doesn't seem that $effectiveUser, $set or $key is used in the subroutine
 #   except that it is passed on to defineProblemEnvironment
-
 	my $pg;
+
 	$pg = WebworkWebservice::RenderProblem->new(
 		$ce,
 		$effectiveUser,
@@ -440,10 +463,10 @@ sub renderProblem {
 #         }
 		
 	);
-  
+
     my ($internal_debug_messages, $pgwarning_messages, $pgdebug_messages);
     if (ref ($pg->{pgcore}) ) {
-    	$internal_debug_messages = $pg->{pgcore}->get_internal_debug_messages;
+    	$internal_debug_messages   = $pg->{pgcore}->get_internal_debug_messages;
     	$pgwarning_messages        = $pg ->{pgcore}->get_warning_messages();
     	$pgdebug_messages          = $pg ->{pgcore}->get_debug_messages();
     } else {
@@ -458,6 +481,7 @@ sub renderProblem {
 		WARNINGS	   				=> encode_base64( 
 		                                 "WARNINGS\n".$warning_messages."\n<br/>More<br/>\n".$pg->{warnings} 
 		                               ),
+		PG_ANSWERS_HASH             => $pg->{pgcore}->{PG_ANSWERS_HASH},
 		problem_result 				=> $pg->{result},
 		problem_state				=> $pg->{state},
 		flags						=> $pg->{flags},
@@ -473,12 +497,11 @@ sub renderProblem {
 	if ($debugXmlCode) {
 		my $logDirectory =$ce->{courseDirs}->{logs};
 		my $xmlDebugLog  = "$logDirectory/xml_debug.txt";
-		#warn "RenderProblem.pm: Opening debug log $xmlDebugLog\n" ;
+		warn "RenderProblem.pm: Opening debug log $xmlDebugLog\n" ;
 		open (DEBUGCODE, ">>$xmlDebugLog") || die "Can't open debug log $xmlDebugLog";
 		print DEBUGCODE "\n\nStart xml encoding\n";
 	}
-	
-	$out2->{answers} = xml_filter($out2->{answers}); # check this -- it might not be working correctly
+	$out2 = xml_filter($out2); # check this -- it might not be working correctly
 	##################
 	close(DEBUGCODE) if $debugXmlCode;
 	###################
@@ -488,7 +511,7 @@ sub renderProblem {
 	$out2->{compute_time} = logTimingInfo($beginTime, $endTime);
 	# warn "flags are" , WebworkWebservice::pretty_print_rh($pg->{flags});
 	
-	$out2;
+	return $out2;
 	         
 }
 
@@ -497,12 +520,20 @@ sub xml_filter {
 	my $input = shift;
 	my $level = shift || 0;
 	my $space="  ";
-	# Hack to filter out CODE references
+	# protect against modules defined in Safe which can't find their stringify procedure.
+	my $dummy = eval { "$input"  };
+	if ($@ ) {
+		print DEBUGCODE "Unable to determine stringify for this item\n";
+		print DEBUGCODE $@, "\n";
+		return;
+	}
 	my $type = ref($input);
+	
+	# Hack to filter out CODE references??
 	if (!defined($type) or !$type ) {
 		print DEBUGCODE $space x $level." : scalar -- not converted\n" if $debugXmlCode;
 	} elsif( $type =~/HASH/i or "$input"=~/HASH/i) {
-		print DEBUGCODE "HASH reference with ".%{$input}." elements will be investigated\n" if $debugXmlCode;
+		print DEBUGCODE "HASH reference ($input) with ".%{$input}." elements will be investigated\n" if $debugXmlCode;
 		$level++;
 		foreach my $item (keys %{$input}) {
 			print DEBUGCODE "  "x$level."$item is " if $debugXmlCode;
@@ -520,12 +551,12 @@ sub xml_filter {
 		}
 		$input = $tmp;
 		$level--;
-		print DEBUGCODE "  "x$level."ARRAY reference completed",join(" ",@$input),"\n" if $debugXmlCode;
+		print DEBUGCODE "  "x$level."ARRAY reference completed: ",join(" ",@$input),"\n" if $debugXmlCode;
 	} elsif($type =~ /CODE/i or "$input" =~/CODE/i) {
 		$input = "CODE reference";
 		print DEBUGCODE "  "x$level."CODE reference, converted $input\n" if $debugXmlCode;
 	} else {
-		print DEBUGCODE  "  "x$level." $type and was  converted to string\n" if $debugXmlCode;
+		print DEBUGCODE  "  "x$level." type |$type| and was  converted to string\n" if $debugXmlCode;
 		$input = "$type reference";
 	}
 	$input;
@@ -555,179 +586,6 @@ sub new {
 	return $renderer->new(@_);
 }
 
-
-#FIXME
-# Save these subroutines.
-# I'd like to use this version of defineProblemEnvir instead of the
-# the version in PG.pm  That adds flexibility.
-
-
-# sub translateDisplayModeNames($) {
-# 	my $name = shift;
-# 	return DISPLAY_MODES()->{$name};
-# }
-# sub defineProblemEnvir {
-# 	my (
-# 		$self,
-# 		$ce,
-# 		$user,
-# 		$key,
-# 		$set,
-# 		$problem,
-# 		$psvn,
-# 		$formFields,
-# 		$options,
-# 	) = @_;
-# 	
-# 	my %envir;
-# 	
-# 	# ----------------------------------------------------------------------
-# 	
-# 	# PG environment variables
-# 	# from docs/pglanguage/pgreference/environmentvariables as of 06/25/2002
-# 	# any changes are noted by "ADDED:" or "REMOVED:"
-# 	
-# 	# Vital state information
-# 	# ADDED: displayModeFailover, displayHintsQ, displaySolutionsQ,
-# 	#        refreshMath2img, texDisposition
-# 	
-# 	$envir{psvn}                = $set->psvn;
-# 	$envir{psvn}          = $envir{psvn};
-# 	$envir{probNum}             = $problem->problem_id;
-# 	$envir{questionNumber}      = $envir{probNum};
-# 	$envir{fileName}            = $problem->source_file;	 
-# 	$envir{probFileName}        = $envir{fileName};		 
-# 	$envir{problemSeed}         = $problem->problem_seed;
-# 	$envir{displayMode}         = translateDisplayModeNames($options->{displayMode});
-# 	$envir{languageMode}        = $envir{displayMode};	 
-# 	$envir{outputMode}          = $envir{displayMode};	 
-# 	$envir{displayHintsQ}       = $options->{showHints};	 
-# 	$envir{displaySolutionsQ}   = $options->{showSolutions};
-# 	$envir{texDisposition}      = "pdf"; # in webwork2, we use pdflatex
-# 	
-# 	# Problem Information
-# 	# ADDED: courseName, formatedDueDate
-# 	
-# 	$envir{openDate}            = $set->open_date;
-# 	$envir{formattedOpenDate}   = formatDateTime($envir{openDate}, $ce->{siteDefaults}{timezone});
-# 	$envir{dueDate}             = $set->due_date;
-# 	$envir{formattedDueDate}    = formatDateTime($envir{dueDate}, $ce->{siteDefaults}{timezone});
-# 	$envir{formatedDueDate}     = $envir{formattedDueDate}; # typo in many header files
-# 	$envir{answerDate}          = $set->answer_date;
-# 	$envir{formattedAnswerDate} = formatDateTime($envir{answerDate}, $ce->{siteDefaults}{timezone});
-# 	$envir{numOfAttempts}       = ($problem->num_correct || 0) + ($problem->num_incorrect || 0);
-# 	$envir{problemValue}        = $problem->value;
-# 	$envir{sessionKey}          = $key;
-# 	$envir{courseName}          = $ce->{courseName};
-# 	
-# 	# Student Information
-# 	# ADDED: studentID
-# 	
-# 	$envir{sectionName}      = $user->section;
-# 	$envir{sectionNumber}    = $envir{sectionName};
-# 	$envir{recitationName}   = $user->recitation;
-# 	$envir{recitationNumber} = $envir{recitationName};
-# 	$envir{setNumber}        = $set->set_id;
-# 	$envir{studentLogin}     = $user->user_id;
-# 	$envir{studentName}      = $user->first_name . " " . $user->last_name;
-# 	$envir{studentID}        = $user->student_id;
-# 	
-# 	# Answer Information
-# 	# REMOVED: refSubmittedAnswers
-# 	
-# 	$envir{inputs_ref} = $formFields;
-# 	
-# 	# External Programs
-# 	# ADDED: externalLaTeXPath, externalDvipngPath,
-# 	#        externalGif2EpsPath, externalPng2EpsPath
-# 	
-# 	$envir{externalTTHPath}      = $ce->{externalPrograms}->{tth};
-# 	$envir{externalLaTeXPath}    = $ce->{externalPrograms}->{latex};
-# 	$envir{externalDvipngPath}   = $ce->{externalPrograms}->{dvipng};
-# 	$envir{externalGif2EpsPath}  = $ce->{externalPrograms}->{gif2eps};
-# 	$envir{externalPng2EpsPath}  = $ce->{externalPrograms}->{png2eps};
-# 	$envir{externalGif2PngPath}  = $ce->{externalPrograms}->{gif2png};
-# 	
-# 	# Directories and URLs
-# 	# REMOVED: courseName
-# 	# ADDED: dvipngTempDir
-# 	# ADDED: MathJaxURL
-# 	# ADDED: asciimathURL
-# 	
-# 	$envir{cgiDirectory}           = undef;
-# 	$envir{cgiURL}                 = undef;
-# 	$envir{classDirectory}         = undef;
-# 	$envir{courseScriptsDirectory} = $ce->{pg}->{directories}->{macros}."/";
-# 	$envir{htmlDirectory}          = $ce->{courseDirs}->{html}."/";
-# 	$envir{htmlURL}                = $ce->{courseURLs}->{html}."/";
-# 	$envir{macroDirectory}         = $ce->{courseDirs}->{macros}."/";
-# 	$envir{templateDirectory}      = $ce->{courseDirs}->{templates}."/";
-# 	$envir{tempDirectory}          = $ce->{courseDirs}->{html_temp}."/";
-# 	$envir{tempURL}                = $ce->{courseURLs}->{html_temp}."/";
-# 	$envir{scriptDirectory}        = undef;
-# 	$envir{webworkDocsURL}         = $ce->{webworkURLs}->{docs}."/";
-# 	$envir{localHelpURL}           = $ce->{webworkURLs}->{local_help}."/";
-# 	$envir{jsMathURL}	           = $ce->{webworkURLs}->{jsMath};
-# 	$envir{asciimathURL}	       = $ce->{webworkURLs}->{asciimath};
-# 	
-# 	# Information for sending mail
-# 	
-# 	$envir{mailSmtpServer} = $ce->{mail}->{smtpServer};
-# 	$envir{mailSmtpSender} = $ce->{mail}->{smtpSender};
-# 	$envir{ALLOW_MAIL_TO}  = $ce->{mail}->{allowedRecipients};
-# 	
-# 	# Default values for evaluating answers
-# 	
-# 	my $ansEvalDefaults = $ce->{pg}->{ansEvalDefaults};
-# 	$envir{$_} = $ansEvalDefaults->{$_} foreach (keys %$ansEvalDefaults);
-# 	
-# 	# ----------------------------------------------------------------------
-# 	
-# 	my $basename = "equation-$envir{psvn}.$envir{probNum}";
-# 	$basename .= ".$envir{problemSeed}" if $envir{problemSeed};
-# 	
-# 	# to make grabbing these options easier, we'll pull them out now...
-# 	my %imagesModeOptions = %{$ce->{pg}->{displayModeOptions}->{images}};
-# 	
-# 	# Object for generating equation images
-# 	$envir{imagegen} = WeBWorK::PG::ImageGenerator->new(
-# 		tempDir  => $ce->{webworkDirs}->{tmp}, # global temp dir
-# 		latex	 => $envir{externalLaTeXPath},
-# 		dvipng   => $envir{externalDvipngPath},
-# 		useCache => 1,
-# 		cacheDir => $ce->{webworkDirs}->{equationCache},
-# 		cacheURL => $ce->{webworkURLs}->{equationCache},
-# 		cacheDB  => $ce->{webworkFiles}->{equationCacheDB},
-# 		useMarkers      => ($imagesModeOptions{dvipng_align} && $imagesModeOptions{dvipng_align} eq 'mysql'),
-# 		dvipng_align    => $imagesModeOptions{dvipng_align},
-# 		dvipng_depth_db => $imagesModeOptions{dvipng_depth_db},
-# 	);
-# 
-# 	#  ADDED: jsMath options
-# 	$envir{jsMath} = {%{$ce->{pg}{displayModeOptions}{jsMath}}};
-# 	
-# 	# Other things...
-# 	$envir{QUIZ_PREFIX}              = $options->{QUIZ_PREFIX}; # used by quizzes
-# 	$envir{PROBLEM_GRADER_TO_USE}    = $ce->{pg}->{options}->{grader};
-# 	$envir{PRINT_FILE_NAMES_FOR}     = $ce->{pg}->{specialPGEnvironmentVars}->{PRINT_FILE_NAMES_FOR};
-# 
-#         #  ADDED: __files__
-#         #    an array for mapping (eval nnn) to filenames in error messages
-# 	$envir{__files__} = {
-# 	  root => $ce->{webworkDirs}{root},     # used to shorten filenames
-# 	  pg   => $ce->{pg}{directories}{root}, # ditto
-# 	  tmpl => $ce->{courseDirs}{templates}, # ditto
-# 	};
-# 	
-# 	# variables for interpreting capa problems and other things to be
-#         # seen in a pg file
-# 	my $specialPGEnvironmentVarHash = $ce->{pg}->{specialPGEnvironmentVars};
-# 	for my $SPGEV (keys %{$specialPGEnvironmentVarHash}) {
-# 		$envir{$SPGEV} = $specialPGEnvironmentVarHash->{$SPGEV};
-# 	}
-# 	
-# 	return \%envir;
-# }
 
 
 1;

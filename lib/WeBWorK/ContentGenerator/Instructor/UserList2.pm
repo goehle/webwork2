@@ -186,6 +186,9 @@ use constant  FIELD_PROPERTIES => {
 	},
 	useMathView => {
 	    access => 'hidden',
+        },
+        lis_source_did => {
+	    access => 'hidden',
 	},
 };
 sub pre_header_initialize {
@@ -1236,7 +1239,9 @@ sub saveEdit_handler {
 	my ($self, $genericParams, $actionParams, $tableParams) = @_;
 	my $r           = $self->r;
 	my $db          = $r->db;
-	
+	my $editorUser = $r->param('user');
+	my $editorUserPermission = $db->getPermissionLevel($editorUser)->permission;	
+
 	my @visibleUserIDs = @{ $self->{visibleUserIDs} };
 	foreach my $userID (@visibleUserIDs) {
 		my $User = $db->getUser($userID); # checked
@@ -1252,7 +1257,8 @@ sub saveEdit_handler {
 		
 		foreach my $field ($PermissionLevel->NONKEYFIELDS()) {
 			my $param = "permission.${userID}.${field}";
-			if (defined $tableParams->{$param}->[0]) {
+			if (defined $tableParams->{$param}->[0] &&
+			    $tableParams->{$param}->[0] <= $editorUserPermission) {
 				$PermissionLevel->$field($tableParams->{$param}->[0]);
 			}
 		}
@@ -1315,11 +1321,16 @@ sub savePassword_handler {
 		die $r->maketext("record for visible user [_1] not found", $userID) unless $User;
 		my $param = "user.${userID}.new_password";
 			if ((defined $tableParams->{$param}->[0]) and ($tableParams->{$param}->[0])) {
-				my $newP = $tableParams->{$param}->[0];
-				my $Password = eval {$db->getPassword($User->user_id)}; # checked	 	
-				my 	$cryptPassword = cryptPassword($newP);											 
-				$Password->password(cryptPassword($newP));
-				eval { $db->putPassword($Password) };				
+			  my $newP = $tableParams->{$param}->[0];
+			  my $Password = eval {$db->getPassword($User->user_id)}; # checked
+			  my 	$cryptPassword = cryptPassword($newP);											 				if (!defined($Password)) {
+			    $Password = $db->newPassword();
+			    $Password->user_id($userID);
+			    $Password->password(cryptPassword($newP));
+			    eval { $db->addPassword($Password) };		             		} else { 
+			      
+			      $Password->password(cryptPassword($newP));
+			      eval { $db->putPassword($Password) };		             		}
 			}
 	}
 	
@@ -1507,7 +1518,10 @@ sub exportUsersToCSV {
 sub fieldEditHTML {
 	my ($self, $fieldName, $value, $properties) = @_;
 	my $r = $self->r;
-	my $ce = $self->r->ce;
+	my $ce = $r->ce;
+	my $db = $r->db;
+	my $editorUser = $r->param('user');
+	my $editorUserPermission = $db->getPermissionLevel($editorUser)->permission;
 	my $size = $properties->{size};
 	my $type = $properties->{type};
 	my $access = $properties->{access};
@@ -1597,7 +1611,7 @@ sub fieldEditHTML {
 		my %roles = %{$ce->{userRoles}};
 		foreach my $role (sort {$roles{$a}<=>$roles{$b}} keys(%roles) ) {
 			my $val = $roles{$role};
-
+			next unless $val <= $editorUserPermission;
 			push(@values, $val);
 			$labels{$val} = $role;
 			$default = $val if ( $value eq $role );
@@ -1651,7 +1665,11 @@ sub recordEditHTML {
 	my $userListURL = $self->systemLink($urlpath->new(type=>'instructor_user_list2', args=>{courseID => $courseName} )) . "&editMode=1&visible_users=" . $User->user_id;
 
 	my $imageURL = $ce->{webworkURLs}->{htdocs}."/images/edit.gif";
-        my $imageLink = CGI::a({href => $userListURL}, CGI::img({src=>$imageURL, border=>0, alt=>"Link to Edit Page for ".$User->user_id}));
+        my $imageLink = '';
+
+	if ($authz->hasPermissions($user, "modify_student_data")) {
+	  $imageLink = CGI::a({href => $userListURL}, CGI::img({src=>$imageURL, border=>0, alt=>"Link to Edit Page for ".$User->user_id}));
+	}
 	
 	my @tableCells;
 	

@@ -212,7 +212,8 @@ sub build_library_subject_tree {
 
 				my $sth = $dbh->prepare($selectClause.$whereClause);
 				$sth->execute;
-				my $numFiles= $sth->rows;
+				my $numFiles= scalar @{$sth->fetchall_arrayref()};
+
 				$section_tree->{num_files} = $numFiles;
 
 				my $clone = { %{ $section_tree } };  # need to clone it before pushing into the @subfield array.
@@ -231,7 +232,7 @@ sub build_library_subject_tree {
 
 			my $sth = $dbh->prepare($selectClause.$whereClause);
 			$sth->execute;
-			my $numFiles = $sth->rows;
+			my $numFiles = scalar @{$sth->fetchall_arrayref()};
 			# my $allFiles = $sth->fetchall_arrayref;
 			 $chapter_tree->{num_files} = $numFiles;
 
@@ -253,12 +254,16 @@ sub build_library_subject_tree {
 
 		my $sth = $dbh->prepare($selectClause.$whereClause);
 		$sth->execute;
-		my $numFiles = $sth->rows;
+		my $numFiles = scalar @{$sth->fetchall_arrayref()};
 		$subject_tree->{num_files} = $numFiles;
 
 		$i++;
-		print $i . " ";
 
+		print sprintf("%3d", $i);
+
+		if ($i%10 == 0) {
+		    print "\n";
+		}
 
 		my $clone = { % {$subject_tree}};
 		push (@subject_tree, $clone);
@@ -317,7 +322,7 @@ sub build_library_textbook_tree {
 
 	for my $textbook (@textbooks){
 		$i++;
-		printf("%3d",$i);
+		printf("%4d",$i);
 		print("\n") if ($i %10==0);
 
 		my $results = $dbh->selectall_arrayref("select ch.chapter_id,ch.name,ch.number "
@@ -346,7 +351,7 @@ sub build_library_textbook_tree {
 
 				my $sth = $dbh->prepare($selectClause.$whereClause);
 				$sth->execute;
-				$section->{num_probs}=$sth->rows;
+				$section->{num_probs}=scalar @{$sth->fetchall_arrayref()};
 
 			}
 			my $whereClause ="WHERE ch.chapter_id='". $chapter->{chapter_id}."' AND "
@@ -354,7 +359,7 @@ sub build_library_textbook_tree {
 
 			my $sth = $dbh->prepare($selectClause.$whereClause);
 			$sth->execute;
-			$chapter->{num_probs}=$sth->rows;
+			$chapter->{num_probs}=scalar @{$sth->fetchall_arrayref()};
 
 			$chapter->{sections}=\@sections;
 		
@@ -363,11 +368,12 @@ sub build_library_textbook_tree {
 
 		my $sth = $dbh->prepare($selectClause.$whereClause);
 		$sth->execute;
-		$textbook->{num_probs}=$sth->rows;
+		$textbook->{num_probs}=scalar @{$sth->fetchall_arrayref()};
 
 		$textbook->{chapters}=\@chapters;
 	}
 
+	print "\n";
 
 	my $webwork_htdocs = $ce->{webwork_dir}."/htdocs";
 	my $file = "$webwork_htdocs/DATA/textbook-tree.json";

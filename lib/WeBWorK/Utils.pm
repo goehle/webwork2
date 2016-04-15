@@ -32,13 +32,14 @@ use DateTime::TimeZone;
 use Date::Parse;
 use Date::Format;
 use File::Copy;
-use File::Spec;
+use File::Spec::Functions qw(canonpath);
 use Time::Zone;
 use MIME::Base64;
 use Errno;
 use File::Path qw(rmtree);
 use Storable;
 use Carp;
+use Mail::Sender;
 
 use constant MKDIR_ATTEMPTS => 10;
 
@@ -52,6 +53,12 @@ use constant MKDIR_ATTEMPTS => 10;
 #     %M = minute, leading 0's
 #     %P = am or pm (Yes %p and %P are backwards :)
 use constant DATE_FORMAT => "%m/%d/%Y at %I:%M%P %Z";
+
+use constant JITAR_MASK => [hex 'FF000000', hex '00FC0000',
+			   hex '0003F000', hex '00000F00',
+			   hex '000000F0', hex '0000000F'];
+use constant JITAR_SHIFT => [24,18,12,8,4,0];
+
 
 our @EXPORT    = ();
 our @EXPORT_OK = qw(
@@ -91,8 +98,16 @@ our @EXPORT_OK = qw(
 	writeLog
 	writeTimingLogEntry
 	wwRound
-	is_restricted
-	grade_set
+        is_restricted
+        grade_set
+	grade_gateway
+	grade_all_sets
+        jitar_id_to_seq
+        seq_to_jitar_id
+        is_jitar_problem_hidden
+        is_jitar_problem_closed
+        jitar_problem_adjusted_status
+        jitar_problem_finished
 );
 
 =head1 FUNCTIONS
@@ -349,11 +364,11 @@ sub path_is_subdir($$;$) {
 		}
 	}
 	
-	$path = File::Spec->canonpath($path);
+	$path = canonpath($path);
 	$path .= "/" unless $path =~ m|/$|;
 	return 0 if $path =~ m#(^\.\.$|^\.\./|/\.\./|/\.\.$)#;
 	
-	$dir = File::Spec->canonpath($dir);
+	$dir = canonpath($dir);
 	$dir .= "/" unless $dir =~ m|/$|;
 	return 0 unless $path =~ m|^$dir|;
 	
@@ -864,7 +879,7 @@ sub decodeAnswers($) {
 	my $serialized = shift;
 	return unless defined $serialized and $serialized;
 	my $array_ref = eval{ Storable::thaw($serialized) };
-	if ($@) {
+	if ($@ or !defined $array_ref) {
 		# My hope is that this next warning is no longer needed since there are few legacy base64 days and the fix seems transparent.
 		# warn "problem fetching answers -- possibly left over from base64 days. Not to worry -- press preview or submit and this will go away  permanently for this question.   $@";
 		return ();
@@ -1130,150 +1145,479 @@ sub is_restricted {
 	return @needed;
 }
 
+# Takes in $db, $set, $setName, $studentName, $setIsVersioned
+# and returns ($totalCorrect,$total) or the percentage correct
+
 sub grade_set {
         
-        my ($db, $set, $setName, $studentName, $setIsVersioned) = @_;
+  my ($db, $set, $setName, $studentName, $setIsVersioned) = @_;
+  
+  my $setID = $set->set_id();  #FIXME   setName and setID should be the same
+  
+  my $status = 0;
+  my $totalRight = 0;
+  my $total      = 0;
+  
+  
+  # DBFIXME: to collect the problem records, we have to know 
+  #    which merge routines to call.  Should this really be an 
+  #    issue here?  That is, shouldn't the database deal with 
+  #    it invisibly by detecting what the problem types are?  
+  #    oh well.
+  
+  my @problemRecords = $db->getAllMergedUserProblems( $studentName, $setID );
+  my $num_of_problems  = @problemRecords || 0;
+  my $max_problems     = defined($num_of_problems) ? $num_of_problems : 0; 
+  
+  if ( $setIsVersioned ) {
+    @problemRecords = $db->getAllMergedProblemVersions( $studentName, $setID, $set->version_id );
+  }   # use versioned problems instead (assume that each version has the same number of problems.
+  
+  # for jitar sets we only use the top level problems
+  if ($set->assignment_type eq 'jitar') {
+    my @topLevelProblems;
+    foreach my $problem (@problemRecords) {
+      my @seq = jitar_id_to_seq($problem->problem_id);
+      push @topLevelProblems, $problem if ($#seq == 0);
+    }
+    
+    @problemRecords = @topLevelProblems;
+  }
+  
+  foreach my $problemRecord (@problemRecords) {
+    my $prob = $problemRecord->problem_id;
+    
+    unless (defined($problemRecord) ){
+      # warn "Can't find record for problem $prob in set $setName for $student";
+      next;
+    }
+    
+    $status           = $problemRecord->status || 0;
 
-        my $setID = $set->set_id();  #FIXME   setName and setID should be the same
+    # we need to get the adjusted jitar grade for our
+    # top level problems. 
+    if ($set->assignment_type eq 'jitar') {
+      $status = jitar_problem_adjusted_status($problemRecord,$db);
+    }
+    
+    # sanity check that the status (score) is 
+    # between 0 and 1
+    my $valid_status = ($status>=0 && $status<=1)?1:0;
+    
+    my $probValue     = $problemRecord->value;
+    $probValue        = 1 unless defined($probValue) and $probValue ne "";  # FIXME?? set defaults here?
+    $total           += $probValue;
+    $totalRight      += $status*$probValue if $valid_status;
+    
+  }  # end of problem record loop
+  
+  if (wantarray) {
+    return ($totalRight,$total);
+  } else {
+    
+    return 0 unless $total;
+    return $totalRight/$total;
+  }
+}
 
-		my $status = 0;
-		my $longStatus = '';
-		my $string     = '';
-		my $twoString  = '';
-		my $totalRight = 0;
-		my $total      = 0;
-		my $num_of_attempts = 0;
+# Takes in $db, $set, $setName, $studentName,
+# and returns ($totalCorrect,$total) or the percentage correct
+# for the highest scoring gateway
+
+sub grade_gateway {
+  my ($db,$set,$setName,$studentName) = @_;
+
+  my @versionNums = $db->listSetVersions($studentName,$setName);
+
+  my $bestTotalRight = 0;
+  my $bestTotal = 0;
+
+  if ( @versionNums ) {
+    for my $i ( @versionNums ) {
+      my $versionedSet = $db->getSetVersion($studentName,$setName,$i);
+
+      my ($totalRight,$total) = grade_set($db,$versionedSet,$versionedSet->set_id, $studentName,1);
+      if ($totalRight > $bestTotalRight) {
+	$bestTotalRight = $totalRight;
+	$bestTotal = $total;
+      }
+    }
+  }
+
+  if (wantarray) {
+    return ($bestTotalRight,$bestTotal);
+  } else {
+    return 0 unless $bestTotal;
+    return $bestTotalRight/$bestTotal;
+  }
+}
+
+# Takes in $db, $studentName,
+# and returns ($totalCorrect,$total) or the percentage correct
+# for all sets in the course
+
+sub grade_all_sets {
+  my ($db, $studentName) = @_;
+
+  my @setIDs = $db->listUserSets($studentName);
+  my @userSetIDs = map {[$studentName,$_]} @setIDs;
+  my @userSets = $db->getMergedSets(@userSetIDs);
+
+  my $courseTotal = 0;
+  my $courseTotalRight = 0;
+
+  foreach my $userSet (@userSets) {
+    if ($userSet->assignment_type() =~ /gateway/) {
+
+      my ($totalRight,$total) = grade_gateway($db,$userSet,$userSet->set_id,$studentName);
+      $courseTotalRight += $totalRight;
+      $courseTotal += $total;
+    } else {
+      my ($totalRight,$total) = grade_set($db,$userSet,$userSet->set_id,$studentName,0);
+
+      $courseTotalRight += $totalRight;
+      $courseTotal += $total;
+    }
+  }
+
+  if (wantarray) {
+    return ($courseTotalRight,$courseTotal);
+  } else {
+    return 0 unless $courseTotal;
+    return $courseTotalRight/$courseTotal;
+  }
+
+}
+  
+   
+
+#takes a tree sequence and returns the jitar id
+#  This id is specially crafted signed 32 bit integer of the form, in binary
+#  SAAAAAAABBBBBBCCCCCCDDDDEEEEFFFF
+#  Here A is the level 1 index, B is the level 2 index, and 
+#  C, D, E and F are the indexes for levels 3 through 6.  
+#  
+#  Note:  Level 1 can contain indexes up to 125.  Levels 2 and 3 can contain 
+#         indxes up to 63.  For levels 4 through
+#         six you are limited to 15. 
+
+sub seq_to_jitar_id {
+    my @seq = @_;
+
+    die("Jitar index 1 must be between 1 and 125") unless 
+	(defined($seq[0]) && $seq[0] < 126);
+
+    my $id = $seq[0];
+    my $ind;
+
+    my @JITAR_SHIFT = @{JITAR_SHIFT()};
+
+    #shift first index to first two bytes
+    $id = $id << $JITAR_SHIFT[0]; 
+ 
+    #look for second and third index
+    for (my $i=1; $i<3; $i++) {
+	if (defined($seq[$i])) {
+	    $ind = $seq[$i];	
+	    die("Jitar index ".($i+1)." must be less than 63") 
+		unless $ind < 63;
+	    
+	    #shift index and or it with id to put it in right place
+	    $ind = $ind << $JITAR_SHIFT[$i];
+	    $id = $id | $ind;
+	}
+    }
+
+    #look for remaining 3 index's
+    for (my $i=3; $i<6; $i++) {
+	if (defined($seq[$i])) {
+	    $ind = $seq[$i];	
+	    die("Jitar index ".($i+1)." must be less than 16") 
+		unless $ind < 16;
+	    
+	    #shift index and or it with id to put it in right place
+	    $ind = $ind << $JITAR_SHIFT[$i];
+	    $id = $id | $ind;
+	}
+    }
+
+    return $id;
+}
+
+# Takes a jitar_id and returns the tree sequence
+#  Jitar id's have the format described above.
+sub jitar_id_to_seq {
+    my $id = shift;
+    my $ind;
+    my @seq;
+
+    my @JITAR_SHIFT = @{JITAR_SHIFT()};
+    my @JITAR_MASK = @{JITAR_MASK()};
+
+    for (my $i=0; $i<6; $i++) {
+	$ind = $id;
+	#use a mask to isolate only the bits we want for this index
+	# and shift them to get the index
+	$ind = $ind & $JITAR_MASK[$i];
+	$ind = $ind >> $JITAR_SHIFT[$i];
+
+	#quit if we dont have a nonzero index 
+	last unless $ind;
 	
+	$seq[$i] = $ind;
+    }
+
+    return @seq;
+}
+
+# Takes in ($db, $userID, $setID, $problemID) and returns 1 if the 
+# problem is hidden.  The problem is hidden if the number of attempts
+# on the parent problem is greater than att_to_open_children, or if the user
+# has run out of attempts.  Everything is opened up after the due date
+
+sub is_jitar_problem_hidden {
+    my ($db, $userID, $setID, $problemID) = @_;
+    
+    die "Not enough arguments.  Use is_jitar_problem_hidden(db,userID,setID,problemID)" unless ($db && $userID && $setID && $problemID);
+
+    my $mergedSet = $db->getMergedSet($userID,$setID); 
+
+    unless ($mergedSet) {
+	warn "Couldn't get set $setID for user $userID from the database";
+	return 0;
+    }
+
+    # only makes sense for jitar sets
+    return 0 unless ($mergedSet->assignment_type eq 'jitar');
+
+    # the set opens everything up after the due date. 
+    return 0 if (after($mergedSet->due_date));
+
+    my @idSeq = jitar_id_to_seq($problemID);
+    my @parentIDSeq = @idSeq;
+
+    unless( $#parentIDSeq != 0 ) {
+	#this means we are at a top level problem and this check doesnt make sense
+	return 0;
+    }
+
+    pop @parentIDSeq;
+    while (@parentIDSeq) {
+
+	my $parentProbID = seq_to_jitar_id(@parentIDSeq);
 	
-		# DBFIXME: to collect the problem records, we have to know 
-		#    which merge routines to call.  Should this really be an 
-		#    issue here?  That is, shouldn't the database deal with 
-		#    it invisibly by detecting what the problem types are?  
-		#    oh well.
-		
-		my @problemRecords = $db->getAllMergedUserProblems( $studentName, $setID );
-		my $num_of_problems  = @problemRecords || 0;
-		my $max_problems     = defined($num_of_problems) ? $num_of_problems : 0; 
-
-		if ( $setIsVersioned ) {
-			@problemRecords = $db->getAllMergedProblemVersions( $studentName, $setID, $set->version_id );
-		}   # use versioned problems instead (assume that each version has the same number of problems.
-		
-
-	####################
-	# Resort records
-	#####################
-		@problemRecords = sort {$a->problem_id <=> $b->problem_id }  @problemRecords;
-		
-		# for gateway/quiz assignments we have to be careful about 
-		#    the order in which the problems are displayed, because
-		#    they may be in a random order
-		if ( $set->problem_randorder ) {
-			my @newOrder = ();
-			my @probOrder = (0..$#problemRecords);
-			# we reorder using a pgrand based on the set psvn
-			my $pgrand = PGrandom->new();
-			$pgrand->srand( $set->psvn );
-			while ( @probOrder ) { 
-				my $i = int($pgrand->rand(scalar(@probOrder)));
-				push( @newOrder, $probOrder[$i] );
-				splice(@probOrder, $i, 1);
-			}
-			# now $newOrder[i] = pNum-1, where pNum is the problem
-			#    number to display in the ith position on the test
-			#    for sorting, invert this mapping:
-			my %pSort = map {($newOrder[$_]+1)=>$_} (0..$#newOrder);
-
-			@problemRecords = sort {$pSort{$a->problem_id} <=> $pSort{$b->problem_id}} @problemRecords;
-		}
-		
-		
-    #######################################################
-	# construct header
+	my $userParentProb = $db->getMergedProblem($userID,$setID,$parentProbID);
 	
-		foreach my $problemRecord (@problemRecords) {
-			my $prob = $problemRecord->problem_id;
-			
-			unless (defined($problemRecord) ){
-				# warn "Can't find record for problem $prob in set $setName for $student";
-				# FIXME check the legitimate reasons why a student record might not be defined
-				next;
-			}
-			
-		    $status           = $problemRecord->status || 0;
-		    my  $attempted    = $problemRecord->attempted;
-			my $num_correct   = $problemRecord->num_correct || 0;
-			my $num_incorrect = $problemRecord->num_incorrect   || 0;
-			$num_of_attempts  += $num_correct + $num_incorrect;
+	unless ($userParentProb) {
+	    warn "Couldn't get problem $parentProbID for user $userID and set $setID from the database";
+	    return 0;
+	}
+	
+	# the child problems are closed unless the number of incorrect attempts is above the 
+	# attempts to open children, or if they have exausted their max_attempts
+	# if att_to_open_children is -1 we just use max attempts
+	# if max_attempts is -1 then they are always less than max attempts
+	if (($userParentProb->att_to_open_children == -1 ||
+	      $userParentProb->num_incorrect() < $userParentProb->att_to_open_children()) && 
+	    ($userParentProb->max_attempts == -1 || $userParentProb->num_incorrect() < $userParentProb->max_attempts())) {
+	    return 1;
+	}
+	pop @parentIDSeq;
+    }
+    
+    # if we get here then all of the parents are open so the problem is open.
+    return 0;
+}
+    
 
-#######################################################
-			# This is a fail safe mechanism that makes sure that
-			# the problem is marked as attempted if the status has
-			# been set or if the problem has been attempted
-			# DBFIXME this should happen in the database layer, not here!
-			if (!$attempted && ($status || $num_correct || $num_incorrect )) {
-				$attempted = 1;
-				$problemRecord->attempted('1');
-				# DBFIXME: this is another case where it 
-				#    seems we shouldn't have to check for 
-				#    which routine to use here...
-				if ( $setIsVersioned ) {
-					$db->putProblemVersion($problemRecord);
-				} else {
-					$db->putUserProblem($problemRecord );
-				}
-			}
-######################################################			
+# takes in ($db, $ce, $userID, $setID, $problemID) and returns 1 if the jitar problem is closed
+# jitar problems are closed if the restrict_prob_progression variable is set on the set
+# and if the previous problem is closed, or hasn't been finished yet.  
+# The first problem in a level is always open. 
 
-			# sanity check that the status (score) is 
-			# between 0 and 1
-			my $valid_status = ($status>=0 && $status<=1)?1:0;
+sub is_jitar_problem_closed {
+    my ($db, $ce, $userID, $setID, $problemID) = @_;
 
-			###########################################
-			# Determine the string $longStatus which 
-			# will display the student's current score
-			###########################################			
+    die "Not enough arguments.  Use is_jitar_problem_closed(db,userID,setID,problemID)" unless ($db && $ce && $userID && $setID && $problemID);
 
-			if (!$attempted){
-				$longStatus     = '.';
-			} elsif   ($valid_status) {
-				$longStatus     = int(100*$status+.5);
-				$longStatus='C' if ($longStatus==100);
-			} else	{
-				$longStatus 	= 'X';
-			}
+    my $mergedSet = $db->getMergedSet($userID,$setID); 
 
-			my $probValue     = $problemRecord->value;
-			$probValue        = 1 unless defined($probValue) and $probValue ne "";  # FIXME?? set defaults here?
-			$total           += $probValue;
-			$totalRight      += $status*$probValue if $valid_status;
-# 				
-# 			# initialize the number of correct answers 
-# 			# for this problem if the value has not been 
-# 			# defined.
-# 			$correct_answers_for_problem{$probID} = 0 
-# 				unless defined($correct_answers_for_problem{$probID});
-			
-# 				
-# 		# add on the scores for this problem
-# 			if (defined($attempted) and $attempted) {
-# 				$number_of_students_attempting_problem{$probID}++;
-# 				push( @{ $attempts_list_for_problem{$probID} } ,     $num_of_attempts);
-# 				$number_of_attempts_for_problem{$probID}             += $num_of_attempts;
-# 				$h_problemData{$probID}                               = $num_incorrect;
-# 				$total_num_of_attempts_for_set                       += $num_of_attempts;
-# 				$correct_answers_for_problem{$probID}                += $status;
-# 			}
+    unless ($mergedSet) {
+	warn "Couldn't get set $setID for user $userID from the database";
+	return 0;
+    }
 
-		}  # end of problem record loop
-		return 0 unless $total;
-		my $percentage = $totalRight/$total;
+    # return 0 unless we are a restricted jitar set
+    return 0 unless ($mergedSet->assignment_type eq 'jitar' && $
+		     mergedSet->restrict_prob_progression());
+
+    # the set opens everything up after the due date. 
+    return 0 if (after($mergedSet->due_date));
 
 
+    my $prob;
+    my $id;
+    my @idSeq = jitar_id_to_seq($problemID);
+    my @parentSeq = @idSeq;
 
-		#return($status,  $longStatus, $string, $twoString, $totalRight, $total, $num_of_attempts, $num_of_problems			);
-		return $percentage;
-}	
+    # problems are automatically closed if their parents are closed
+    #this means we cant find a previous problem to test against so we are open as long as the parent is open
+    pop(@parentSeq);
+    
+    #if we can't get a parent problem then this is a top level problem and we
+    # we just check the previous. 
+    if (@parentSeq) {
+	$id = seq_to_jitar_id(@parentSeq);
+	if (is_jitar_problem_closed($db,$ce,$userID,$setID,$id)) {
+	    return 1;
+	}
+    }
+    
+    # if the parent is open then we are open if the previous
+    # problem has been "completed" or, if we are the first problem in this level
+    
+    do {	
+	$idSeq[$#idSeq]--;
+	    
+	# in this case we are the first problem in the level
+	if ($idSeq[$#idSeq] == 0) {
+	    return 0;
+	}
+	
+	$id = seq_to_jitar_id(@idSeq);
+    } until ($db->existsUserProblem($userID,$setID,$id));
 
+    $prob = $db->getMergedProblem($userID,$setID,$id);
+    
+    # we have to test against the target status in case the student
+    # is working in the reduced scoring period
+    my $targetStatus = 1;
+    if ($ce->{pg}{ansEvalDefaults}{enableReducedScoring} &&
+	$mergedSet->enable_reduced_scoring && 
+	after($mergedSet->reduced_scoring_date)) {
+	$targetStatus = $ce->{pg}{ansEvalDefaults}{reducedScoringValue};
+    }	
+    
+    if (abs(jitar_problem_adjusted_status($prob,$db) - $targetStatus) < .001 ||
+	jitar_problem_finished($prob,$db)) {
+	
+	# either the previous problem is 100% or is finished
+	return 0;
+    } else {
+	
+	#in this case the previous problem is hidden
+	return 1
+    }
+    
+}
+
+# returns the adjusted status for a jitar problem. 
+# this is either the problems status or it is the greater of the 
+# status and the score generated by taking the weighted average of all
+# child problems that have the "counts_parent_grade" flag set
+
+sub jitar_problem_adjusted_status {
+    my ($userProblem,  $db) = @_;
+    
+    #this is goign to happen often enough that the check saves time
+    return 1 if $userProblem->status == 1;
+    
+    my @problemSeq = jitar_id_to_seq($userProblem->problem_id);
+
+    my @problemIDs = $db->listUserProblems($userProblem->user_id,$userProblem->set_id);
+    
+    my @weights;
+    my @scores;
+
+    ID: foreach my $id (@problemIDs) {
+	my @seq = jitar_id_to_seq($id);
+
+	#check and see if this is a child
+	# it has to be one level deper
+	next unless $#seq == $#problemSeq+1;
+	
+	# and it has to equal @seq up to the penultimate index
+	for (my $i = 0; $i<=$#problemSeq; $i++) {
+	    next ID unless $seq[$i] == $problemSeq[$i];
+	}
+
+	#check to see if this counts towards the parent grade
+	my $problem = $db->getMergedProblem($userProblem->user_id, $userProblem->set_id, $id);
+
+	die "Couldn't get problem $id for user ". $userProblem->user_id." and set ".$userProblem->set_id." from the database" unless $problem;
+
+	# skip if it doesnt
+	next unless $problem->counts_parent_grade();
+
+	# if it does count then add its adjusted status to the grading array
+	push @weights, $problem->value;
+	push @scores, jitar_problem_adjusted_status($problem,$db);
+    }
+
+    # if no children count towards the problem grade return status
+    return $userProblem->status unless (@weights && @scores);
+
+    # if children do count then return the larger of the two (?) 
+    my $childScore = 0;
+    my $totalWeight = 0;
+    for (my $i=0; $i<=$#scores; $i++) {
+	$childScore += $scores[$i]*$weights[$i];
+	$totalWeight += $weights[$i];
+    }
+
+    $childScore = $childScore/$totalWeight;
+
+    if ($childScore > $userProblem->status) {
+	return $childScore;
+    } else {
+	return $userProblem->status;
+    }
+}
+
+
+# returns 1 if the given problem is "finished"  This happens when the problem attempts have
+# been maxed out, and the attempts of any children with the "counts_to_parent_grade" also 
+# have their attemtps maxed out.  (In other words if the grade can't be raised any more)
+
+sub jitar_problem_finished {
+    my ($userProblem,  $db) = @_;
+
+    # the problem is open if you can still make attempts and you dont have a 100%
+    return 0 if ($userProblem->status < 1 &&
+		 ($userProblem->max_attempts == -1 ||
+	$userProblem->max_attempts > ($userProblem->num_correct + 
+				      $userProblem->num_incorrect)));
+
+    # find children 
+    my @problemSeq = jitar_id_to_seq($userProblem->problem_id);
+
+    my @problemIDs = $db->listUserProblems($userProblem->user_id,$userProblem->set_id);
+
+    ID: foreach my $id (@problemIDs) {
+	my @seq = jitar_id_to_seq($id);
+
+	#check and see if this is a child
+	next unless $#seq == $#problemSeq+1;
+	for (my $i = 0; $i<=$#problemSeq; $i++) {
+	    next ID unless $seq[$i] == $problemSeq[$i];
+	}
+
+	#check to see if this counts towards the parent grade
+	my $problem = $db->getMergedProblem($userProblem->user_id, $userProblem->set_id, $id);
+
+	die "Couldn't get problem $id for user ".$userProblem->user_id." and set ".$userProblem->set_id." from the database" unless $problem;
+
+	# if this doesn't count then we dont need to worry about it
+	next unless $problem->counts_parent_grade();
+
+	#if it does then see if the problem is finished
+	# if it isn't then the parent isnt finished either. 
+	return 0 unless jitar_problem_finished($problem,$db);
+
+    }
+
+    # if we got here then the problem is finished
+    return 1;
+}
 
 1;

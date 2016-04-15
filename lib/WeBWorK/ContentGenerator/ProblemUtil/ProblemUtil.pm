@@ -39,10 +39,10 @@ use WeBWorK::PG;
 use WeBWorK::PG::ImageGenerator;
 use WeBWorK::PG::IO;
 use WeBWorK::Utils qw(readFile writeLog writeCourseLog encodeAnswers decodeAnswers
-	ref2string makeTempDirectory path_is_subdir sortByName before after between);
+	ref2string makeTempDirectory path_is_subdir sortByName before after between jitar_problem_adjusted_status jitar_id_to_seq);
 use WeBWorK::DB::Utils qw(global2user user2global);
 use URI::Escape;
-
+use WeBWorK::Authen::LTIAdvanced::SubmitGrade;
 use WeBWorK::Utils::Tasks qw(fake_set fake_problem);
 
 # process_and_log_answer subroutine.
@@ -89,7 +89,7 @@ sub process_and_log_answer{
 				$answerString  .= $student_ans."\t";
 				# answer score *could* actually be a float, and this doesnt
 				# allow for fractional answers :(
-				$scores .= $answerHash{$_}->{score} >= 1 ? "1" : "0";
+				$scores .= ($answerHash{$_}->{score}//0) >= 1 ? "1" : "0";
 				$isEssay = 1 if ($answerHash{$_}->{type}//'') eq 'essay';
 
 			}
@@ -133,18 +133,31 @@ sub process_and_log_answer{
 		if (defined $pureProblem) {
 			# store answers in DB for sticky answers
 			my %answersToStore;
-			my %answerHash = %{ $pg->{answers} };
-			$answersToStore{$_} = $self->{formFields}->{$_}  #$answerHash{$_}->{original_student_ans} -- this may have been modified for fields with multiple values.  Don't use it!!
-			foreach (keys %answerHash);
+			#my %answerHash = %{ $pg->{answers} };
+			# may not need to store answerHash explicitly since
+			# it (usually?) has the same name as the first of the responses
+			# $answersToStore{$_} = $self->{formFields}->{$_} foreach (keys %answerHash);
+			# $answerHash{$_}->{original_student_ans} -- this may have been modified for fields with multiple values.  
+			# Don't use it!!
+			my @answer_order;
+			my %answerHash = %{ $pg->{pgcore}->{PG_ANSWERS_HASH}};
+   			foreach my $ans_id (@{$pg->{flags}->{ANSWER_ENTRY_ORDER}//[]} ) {
+   				foreach my $response_id ($answerHash{$ans_id}->response_obj->response_labels) {
+   					$answersToStore{$response_id} = $self->{formFields}->{$response_id}; 
+   				    push @answer_order, $response_id;
+   				 }	
+   			}
 			
 			# There may be some more answers to store -- one which are auxiliary entries to a primary answer.  Evaluating
 			# matrices works in this way, only the first answer triggers an answer evaluator, the rest are just inputs
 			# however we need to store them.  Fortunately they are still in the input form.
-			my @extra_answer_names  = @{ $pg->{flags}->{KEPT_EXTRA_ANSWERS}};
-			$answersToStore{$_} = $self->{formFields}->{$_} foreach  (@extra_answer_names);
+			#my @extra_answer_names  = @{ $pg->{flags}->{KEPT_EXTRA_ANSWERS}//[]};
+			#$answersToStore{$_} = $self->{formFields}->{$_} foreach  (@extra_answer_names);
 			
 			# Now let's encode these answers to store them -- append the extra answers to the end of answer entry order
-			my @answer_order = (@{$pg->{flags}->{ANSWER_ENTRY_ORDER}}, @extra_answer_names);
+			#my @answer_order = (@{$pg->{flags}->{ANSWER_ENTRY_ORDER}//[]}, @extra_answer_names);
+			# %answerToStore and @answer_order are passed as references
+			# because of profile for encodeAnswers
 			my $answerString = encodeAnswers(%answersToStore,
 							 @answer_order);
 			
@@ -204,7 +217,28 @@ sub process_and_log_answer{
 					$pureProblem->last_answer."\t".
 					$pureProblem->num_correct."\t".
 					$pureProblem->num_incorrect
-				);
+					);
+
+				#Try to update the student score on the LMS
+				# if that option is enabled.
+				my $LTIGradeMode = $self->{ce}->{LTIGradeMode} // '';
+				if ($LTIGradeMode && $self->{ce}->{LTIGradeOnSubmit}) {
+				  my $grader = WeBWorK::Authen::LTIAdvanced::SubmitGrade->new($r);
+				  if ($LTIGradeMode eq 'course') {
+				    if ($grader->submit_course_grade($problem->user_id)) {
+				      $scoreRecordedMessage .= $r->maketext("Your score was successfully sent to the LMS");
+				    } else {
+				      $scoreRecordedMessage .= $r->maketext("Your score was not successfully sent to the LMS");
+				    }
+				  } elsif ($LTIGradeMode eq 'homework') {
+				    if ($grader->submit_set_grade($problem->user_id, $problem->set_id)) {
+				      $scoreRecordedMessage .= $r->maketext("Your score was successfully sent to the LMS");
+				    } else {
+				      $scoreRecordedMessage .= $r->maketext("Your score was not successfully sent to the LMS");
+				    }
+				  }
+				}
+				
 			} else {
 				if (before($set->open_date) or after($set->due_date)) {
 					$scoreRecordedMessage = $r->maketext("Your score was not recorded because this homework set is closed.");
@@ -673,6 +707,142 @@ sub check_invalid{
 
 sub test{
 	print "test";
+}
+
+# if you provide this subroutine with a userProblem it will notify the 
+# instructors of the course that the student has finished the problem,
+# and its children, and did not get 100%
+sub jitar_send_warning_email {
+    my $self = shift;
+    my $userProblem = shift;
+
+    my $r= $self->r;
+    my $ce = $r->ce;
+    my $db = $r->db;
+    my $authz = $r->authz;
+    my $urlpath    = $r->urlpath;
+    my $courseID = $urlpath->arg("courseID");
+    my $userID = $userProblem->user_id;
+    my $setID = $userProblem->set_id;
+    my $problemID = $userProblem->problem_id;
+
+    my $status = jitar_problem_adjusted_status($userProblem,$r->db);
+    $status = eval{ sprintf("%.0f%%", $status * 100)}; # round to whole number
+
+    my $user = $db->getUser($userID);
+    
+    debug("Couldn't get user $userID from database") unless $user;
+
+    my $emailableURL = $self->systemLink(
+	$urlpath->newFromModule("WeBWorK::ContentGenerator::Problem", $r, 
+				courseID => $courseID, setID => $setID, problemID => $problemID), params=>{effectiveUser=>$userID}, use_abs_url=>1);
+
+
+	my @recipients;
+        # send to all users with permission to score_sets an email address
+	# DBFIXME iterator?
+	foreach my $rcptName ($db->listUsers()) {
+		if ($authz->hasPermissions($rcptName, "score_sets")) {
+			my $rcpt = $db->getUser($rcptName); # checked
+			next if $ce->{feedback_by_section} and defined $user
+			    and defined $rcpt->section and defined $user->section
+			    and $rcpt->section ne $user->section;
+			if ($rcpt and $rcpt->email_address) {
+			    push @recipients, $rcpt->rfc822_mailbox;
+			}
+		}
+	}
+    
+    my $sender;
+    if ($user->email_address) {
+	$sender = $user->rfc822_mailbox;
+    } elsif ($user->full_name) {
+	$sender = $user->full_name;
+    } else {
+	$sender = $userID;
+    }
+
+    $problemID = join('.',jitar_id_to_seq($problemID));
+        
+    
+    my %subject_map = (
+	'c' => $courseID,
+	'u' => $userID,
+	's' => $setID,
+	'p' => $problemID,
+	'x' => $user->section,
+	'r' => $user->recitation,
+	'%' => '%',
+	);
+    my $chars = join("", keys %subject_map);
+    my $subject = $ce->{mail}{feedbackSubjectFormat}
+    || "WeBWorK question from %c: %u set %s/prob %p"; # default if not entered
+    $subject =~ s/%([$chars])/defined $subject_map{$1} ? $subject_map{$1} : ""/eg;
+		
+    my $headers = "X-WeBWorK-Course: $courseID\n" if defined $courseID;
+    $headers .= "X-WeBWorK-User: ".$user->user_id."\n";
+    $headers .= "X-WeBWorK-Section: ".$user->section."\n";
+    $headers .= "X-WeBWorK-Recitation: ".$user->recitation."\n";
+    $headers .= "X-WeBWorK-Set: ".$setID."\n";
+    $headers .= "X-WeBWorK-Problem: ".$problemID."\n";
+    
+    # bring up a mailer
+    my $mailer = Mail::Sender->new({
+		from => $ce->{mail}{smtpSender},
+		tls_allowed => $ce->{tls_allowed}//1, # the default for this for  Mail::Sender is 1
+		fake_from => $sender,
+		to => join(",", @recipients),
+		smtp    => $ce->{mail}->{smtpServer},
+		subject => $subject,
+		headers => $headers,
+	});
+    unless (ref $mailer) {
+      $r->log_error( "Failed to create a mailer to send a JITAR alert message: $Mail::Sender::Error");
+      return "";
+    }
+    
+    unless (ref $mailer->Open()) {
+      $r->log_error("Failed to open the mailer to send a JITAR alert message: $Mail::Sender::Error");
+      return "";
+    }
+
+    my $MAIL = $mailer->GetHandle();
+    
+    my $full_name = $user->full_name;
+    my $email_address = $user->email_address;
+    my $student_id = $user->student_id;
+    my $section = $user->section;
+    my $recitation = $user->recitation;
+    my $comment = $user->comment;
+
+    # print message
+    print $MAIL  <<EOM;
+This  message was automatically generated by WeBWorK.
+
+User $full_name ($userID) has not sucessfully completed the review for problem $problemID in set $setID.  Their final adjusted score on the problem is $status.  
+
+Click this link to visit the problem: $emailableURL
+
+User ID:    $userID
+Name:       $full_name 
+Email:      $email_address
+Student ID: $student_id
+Section: $section
+Recitation: $recitation
+Comment: $comment
+
+EOM
+    # Close returns the mailer object on success, a negative value on failure,
+    # zero if mailer was not opened.
+    my $result = $mailer->Close;
+    
+    if (ref $result) {
+	debug("Successfully sent JITAR alert message");
+    } else {
+      $r->log_error("Failed to send JITAR alert message ($result): $Mail::Sender::Error");
+    }
+    
+    return "";
 }
 
 1;

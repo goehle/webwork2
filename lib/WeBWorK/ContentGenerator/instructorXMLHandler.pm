@@ -170,17 +170,21 @@ sub pre_header_initialize {
 
 	$xmlrpc_client->url($XML_URL);
 	$xmlrpc_client->{form_action_url}= $FORM_ACTION_URL;
-	$xmlrpc_client->{displayMode}   = DISPLAYMODE();
+#	$xmlrpc_client->{displayMode}   = DISPLAYMODE();
 	$xmlrpc_client->{user}          = 'xmluser';
-	$xmlrpc_client->{password}      = $XML_PASSWORD;
-	$xmlrpc_client->{course}        = $r->param('courseID');
+#	$xmlrpc_client->{password}      = $XML_PASSWORD;
+	$xmlrpc_client->{site_password} = $XML_PASSWORD;
+#	$xmlrpc_client->{course}        = $r->param('courseID');
+	$xmlrpc_client->{courseID}      = $r->param('courseID');
+
 	# print STDERR WebworkClient::pretty_print($r->{paramcache});
-	
+
 	my $input = {#can I just use $->param? it looks like a hash
 
-		    pw                      => $r->param('pw') ||undef,
+#		    pw                      => $r->param('pw') ||undef,
 		    session_key             => $r->param("session_key") ||undef,
 		    userID                  => $r->param("user") ||undef,
+		    courseID                => $r->param('courseID'),
 		    library_name            => $r->param("library_name") ||undef,
 		    user        	        => $r->param("user") ||undef,
 		    set                     => $r->param("set") ||undef,
@@ -255,7 +259,11 @@ sub pre_header_initialize {
             overrides				=> $r->param('overrides') || undef,
 			showHints				=> $r->param('showHints') || 0,
 			showSolutions			=> $r->param('showSolutions') || 0,
+		    processAnswers => defined($r->param('processAnswers')) ? $r->param('processAnswers') : 1,
 	};
+
+
+
 	if ($UNIT_TESTS_ON) {
 		print STDERR "instructorXMLHandler.pm ".__LINE__." values obtained from form parameters\n\t",
 		   format_hash_ref($input);
@@ -263,42 +271,46 @@ sub pre_header_initialize {
 	my $source = "";
 	#print $r->param('problemPath');
 	my $problemPath = $r->param('problemPath');
-	if (defined($problemPath) and $problemPath and -r $problemPath ) {
-    	eval { $source = WeBWorK::Utils::readFile($problemPath) };
-    	#print "SOURCE\n".$source;
-    	$input->{source} = encode_base64($source);
-	}
-	
+	if (defined($problemPath) and $problemPath) {
+            $input->{path} = $problemPath;
+	} elsif ($r->param('problemSource')) {
+            $input->{source} = $r->param('problemSource');
+        }
+
 	my $std_input = standard_input();
 	$input = {%$std_input, %$input};
-	# Fix the environment display mode
-	$input->{envir}->{displayMode} = $input->{displayMode} if($input->{displayMode});
+	# Fix the environment display mode and problemSeed
 	# Set environment variables for hints/solutions
-	$input->{envir}->{showHints} = $r->param('showHints') if($r->param('showHints'));
-	$input->{envir}->{showSolutions} = $r->param('showSolutions') if($r->param('showSolutions'));
+	# Set the permission level and probNum
+	$input->{envir} = {
+		%{$input->{envir}},		# this may have undefined entries
+		showHints 		=> ($r->param('showHints')) ? $r->param('showHints'):0,
+		showSolutions 	=> ($r->param('showSolutions')) ? $r->param('showSolutions'):0,
+		probNum  		=> $r->param("probNum") ||undef, 
+		permissionLevel => ($r->{ce}->{userRoles}->{$r->param('permissionLevel')//0})// 0,
+		displayMode     => $r->param("displayMode") || undef,
+		problemSeed	    => $r->param("problemSeed") || 0,
+		
+ 	};
+ 	$input->{envir}->{inputs_ref} ={
+ 		%{ $input->{envir}->{inputs_ref}},
+		displayMode => $r->param("displayMode") || 0,
+		problemSeed => $r->param("problemSeed") || 0,
+	};
+
+
 	
-	## getting an error below (pstaab on 6/10/2013)  I don't this this is used anymore.  
-
-
-	##########################################
-	# FIXME hack to get fileName or filePath   param("set") contains the path
-	# my $problemPath = $input->{set};   # FIXME should rename this ????
-	# $problemPath =~ m|templates/(.*)|;
-	# $problemPath = $1;    # get everything in the path after templates
-	# $input->{envir}->{fileName}= $problemPath;
-	##################################################
-	$input->{courseID} = $r->param('courseID');
 
 	##############################
 	# xmlrpc_client calls webservice with the requested command
 	#
-	# and stores the resulting XML output in $self->{output}
+	# and stores the resulting XML output in $self->{return_object}
 	# from which it will eventually be returned to the browser
 	#
 	##############################
 	#if ( $xmlrpc_client->jsXmlrpcCall($r->param("xml_command"), $input) ) {
 	#	print "tried to render a problem";
-		#$self->{output} = $xmlrpc_client->formatRenderedProblem;#not sure what to do here just yet.
+		#$self->{output} = ($xmlrpc_client->formatRenderedProblem); #not sure what to do here just yet.
 	#} else {
 	#	$self->{output} = $xmlrpc_client->{output};  # error report
 	#	print $xmlrpc_client->{output};
@@ -313,62 +325,38 @@ sub pre_header_initialize {
 	        $problemPath = $1;    # get everything in the path after templates
 	    	$input->{envir}->{fileName}=$problemPath;
 	    }
-		$self->{output}->{problem_out} = $xmlrpc_client->xmlrpcCall('renderProblem', $input);
+		$xmlrpc_client->xmlrpcCall('renderProblem', $input);
+		# original method of signaling $xmlrpc_client->{renderProblem} = 1; #flag to indicate the renderProblem command was executed.
+		$self->{xml_command} = 'renderProblem';
+		$self->{output} = $xmlrpc_client;
 		my @params = join(" ", $r->param() ); # this seems to be necessary to get things read.?
 		# FIXME  -- figure out why commmenting out the line above means that $envir->{fileName} is not defined. 
 		#$self->{output}->{text} = "Rendered problem";
 	} else {	
-		$self->{output} = $xmlrpc_client->xmlrpcCall($r->param("xml_command"), $input);
+		$xmlrpc_client->xmlrpcCall($r->param("xml_command"), $input);
+		$self->{xml_command} = $r->param("xml_command");
+		$self->{output} = $xmlrpc_client
 	}
-	################################
  }
  
 
 sub standard_input {
 	my $out = {
-		pw            			=>   '',   # not needed
-		password      			=>   '',   # not needed
+		course_password         =>   '',   # not needed  use site_password??
 		session_key             =>   '',
 		userID          		=>   '',   # not needed
 		set               		=>   '',
 		library_name 			=>  'Library',
 		command      			=>  'all',
 		answer_form_submitted   =>   1,
-		extra_packages_to_load  => [qw( AlgParserWithImplicitExpand Expr
-		                                ExprWithImplicitExpand AnswerEvaluator
-		                                AnswerEvaluatorMaker 
-		)],
 		mode                    => 'images',
-		modules_to_evaluate     => [ qw( 
-Exporter
-DynaLoader								
-GD
-WWPlot
-Fun
-Circle
-Label								
-PGrandom
-Units
-Hermite
-List								
-Match
-Multiple
-Select							
-AlgParser
-AnswerHash							
-Fraction
-VectorField							
-Complex1
-Complex							
-MatrixReal1 Matrix							
-Distributions
-Regression
-
-		)], 
-		envir                   => environment(),
+		envir                   => { 
+		                inputs_ref => {displayMode => DISPLAYMODE()},
+					    problemValue => -1, 
+					    fileName => ''},
 		problem_state           => {
 		
-			num_of_correct_ans  => 200, # we are picking phoney values so
+			num_of_correct_ans  => 200, # we are picking phoney values so that solutions are available
 			num_of_incorrect_ans => 400,
 			recorded_score       => 1.0,
 		},
@@ -381,71 +369,6 @@ Regression
 	$out;
 }
 
-sub environment {
-	my $envir = {
-		answerDate  => '4014438528',
-		CAPA_Graphics_URL=>'http://webwork-db.math.rochester.edu/capa_graphics/',
-		CAPA_GraphicsDirectory =>'/ww/webwork/CAPA/CAPA_Graphics/',
-		CAPA_MCTools=>'/ww/webwork/CAPA/CAPA_MCTools/',
-		CAPA_Tools=>'/ww/webwork/CAPA/CAPA_Tools/',
-		cgiDirectory=>'Not defined',
-		cgiURL => 'Not defined',
-		classDirectory=> 'Not defined',
-		courseName=>'Not defined',
-		courseScriptsDirectory=>'/ww/webwork/system/courseScripts/',
-		displayMode=>DISPLAYMODE,
-		dueDate=> '4014438528',
-		externalGif2EpsPath=>'not defined',
-		externalPng2EpsPath=>'not defined',
-		fileName=>'the XMLHandler environment->{fileName} should be set',
-		formattedAnswerDate=>'6/19/00',
-		formattedDueDate=>'6/19/00',
-		formattedOpenDate=>'6/19/00',
-		functAbsTolDefault=> 0.0000001,
-		functLLimitDefault=>0,
-		functMaxConstantOfIntegration=> 1000000000000.0,
-		functNumOfPoints=> 5,
-		functRelPercentTolDefault=> 0.000001,
-		functULimitDefault=>1,
-		functVarDefault=> 'x',
-		functZeroLevelDefault=> 0.000001,
-		functZeroLevelTolDefault=>0.000001,
-		htmlDirectory =>'/ww/webwork/courses/gage_course/html/',
-		htmlURL =>'http://webwork-db.math.rochester.edu/gage_course/',
-		inputs_ref => {
-				 AnSwEr1 => '',
-				 AnSwEr2 => '',
-				 AnSwEr3 => '',
-		},
-		macroDirectory=>'/ww/webwork/courses/gage_course/templates/macros/',
-		numAbsTolDefault=>0.0000001,
-		numFormatDefault=>'%0.13g',
-		numOfAttempts=> 0,
-		numRelPercentTolDefault => 0.0001,
-		numZeroLevelDefault =>0.000001,
-		numZeroLevelTolDefault =>0.000001,
-		openDate=> '3014438528',
-		PRINT_FILE_NAMES_FOR => [ ],
-		probFileName => 'probFileName should not be used --use fileName instead',
-		problemSeed  => 1234,
-		problemValue => -1,
-		probNum => 13,
-		psvn => 54321,
-		questionNumber => 1,
-		scriptDirectory => 'Not defined',
-		sectionName => 'Gage',
-		sectionNumber => 1,
-		sessionKey=> 'Not defined',
-		setNumber =>'MAAtutorial',
-		studentLogin =>'gage',
-		studentName => 'Mike Gage',
-		tempDirectory => '/ww/htdocs/tmp/gage_course/',
-		templateDirectory=>'/ww/webwork/courses/gage_course/templates/',
-		tempURL=>'http://webwork-db.math.rochester.edu/tmp/gage_course/',
-		webworkDocsURL => 'http://webwork.math.rochester.edu/webwork_gage_system_html',
-	};
-	$envir;
-};
 
 sub pretty_print_json { 
     shift if UNIVERSAL::isa($_[0] => __PACKAGE__);
@@ -500,18 +423,37 @@ sub content {
    # Return content of rendered problem to the browser that requested it
    ###########################
    	my $self = shift;
-	
-	#for handling errors...i'm to lazy to make it work right now
-	if($self->{output}->{problem_out}){
-		print $self->{output}->{problem_out}->{text};
+	my $xmlrpc_client;
+	if ( ref($self->{output})=~/WebworkClient/) {
+		$xmlrpc_client = $self->{output};
 	} else {
-		print '{"server_response":"'.$self->{output}->{text}.'",';
-		if($self->{output}->{ra_out}){
-			# print '"result_data":'.pretty_print_json($self->{output}->{ra_out}).'}';
-			if (ref($self->{output}->{ra_out})) {
-				print '"result_data": ' . to_json($self->{output}->{ra_out}) .'}';
+		Croak("No content was returned by the xmlrpc call");
+	}
+	if ( ($xmlrpc_client->fault) ) {  # error -- print error string
+	    my $err_string = $xmlrpc_client->error_string;	    
+	    die($err_string);
+	} elsif($self->{xml_command} eq 'renderProblem'){
+		# FIXME hack
+		# we need to regularize the way that text is returned.
+		# it behaves differently when re-randomization in the library takes place
+		# then during the initial rendering. 
+		# print only the text field (not the ra_out field)
+		# and print the text directly without formatting.
+		if ($xmlrpc_client->return_object->{problem_out}->{text}) {
+			print $xmlrpc_client->return_object->{problem_out}->{text};
+		} else {
+				print $xmlrpc_client->return_object->{text}; 
+		}
+	} else {  #returned something other than a rendered problem.
+	    	  # in this case format a json string and print it. 
+	    	  # the contents of "{text}" needs to be labeled server response;
+		print '{"server_response":"'.$xmlrpc_client->return_object->{text}.'",';
+		if($xmlrpc_client->return_object->{ra_out}){
+			# print '"result_data":'.pretty_print_json($xmlrpc->return_object->{ra_out}).'}';
+			if (ref($xmlrpc_client->return_object->{ra_out})) {
+				print '"result_data": ' . to_json($xmlrpc_client->return_object->{ra_out}) .'}';
 			} else {
-				print '"result_data": "' . $self->{output}->{ra_out} . '"}';
+				print '"result_data": "' . $xmlrpc_client->return_object->{ra_out} . '"}';
 			}
 		} else {
 			print '"result_data":""}';

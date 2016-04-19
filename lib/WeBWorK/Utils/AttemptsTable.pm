@@ -372,7 +372,9 @@ sub previewCorrectAnswer {
 	# return "" unless defined $tex and $tex ne "";
 	
 	if ($displayMode eq "plainText") {
-		return $tex;
+	  return $tex;
+	} elsif (($answerResult->{type}//'') eq 'string_literal') {
+	  return $tex;
 	} elsif ($displayMode eq "images") {
 		$imgGen->add($tex);
 		# warn "adding $tex";
@@ -451,6 +453,7 @@ sub formatToolTip {  # note that formatToolTip output includes CGI::td wrapper
 	my $self = shift;
 	my $answer = shift;
 	my $formattedAnswer = shift;
+
 	return CGI::td({onmouseover=>qq!Tip('$answer',SHADOW, true, 
 		                    DELAY, 1000, FADEIN, 300, FADEOUT, 300, STICKY, 1, OFFSETX, -20, CLOSEBTN, true, CLICKCLOSE, false, 
 		                    BGCOLOR, '#F4FF91', TITLE, 'Entered:',TITLEBGCOLOR, '#F4FF91', TITLEFONTCOLOR, '#000000')!},

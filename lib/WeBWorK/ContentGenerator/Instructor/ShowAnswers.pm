@@ -508,6 +508,9 @@ sub body {
 		  } elsif ($answerType eq 'essay') {
 		    $answerstring = PGcore::encode_pg_and_html($answer);
 		    $td->{class} = 'essay';
+		  } elsif ($answerType eq 'string_literal') {
+		    $answerstring = PGcore::encode_pg_and_html($answer);
+		    $answerstring = '<pre>'.$answerstring.'</pre>';
 		  } else {
 		    $answerstring = PGcore::encode_pg_and_html($answer);
 		  }

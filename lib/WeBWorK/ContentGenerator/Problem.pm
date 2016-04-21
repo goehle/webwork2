@@ -1770,7 +1770,6 @@ sub output_comments{
 		if ($userPastAnswer->comment_string) {
 
 		    my $comment = $userPastAnswer->comment_string;
-		    $comment = CGI::escapeHTML($comment);
 		    my $formFields = { WeBWorK::Form->new_from_paramable($r)->Vars };
 		   		    print CGI::start_div({id=>"answerComment", class=>"answerComments"});
 		    print CGI::b("Instructor Comment:"),  CGI::br();

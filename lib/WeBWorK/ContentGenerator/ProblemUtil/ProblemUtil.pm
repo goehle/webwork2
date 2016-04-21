@@ -70,7 +70,8 @@ sub process_and_log_answer{
 	my $scoreRecordedMessage = "";
 	my $pureProblem;
 	my $isEssay = 0;
-
+	my $comment = '';
+	
 	$pureProblem = $db->getUserProblem($problem->user_id, $problem->set_id, $problem->problem_id); # checked
 	
 	# logging student answers
@@ -91,6 +92,7 @@ sub process_and_log_answer{
 				# allow for fractional answers :(
 				$scores .= ($answerHash{$_}->{score}//0) >= 1 ? "1" : "0";
 				$isEssay = 1 if ($answerHash{$_}->{type}//'') eq 'essay';
+				$comment .= $answerHash{$_}->{comment}//'';
 
 			}
 
@@ -118,6 +120,7 @@ sub process_and_log_answer{
 			$pastAnswer->scores($scores);
 			$pastAnswer->answer_string($answerString);
 			$pastAnswer->source_file($problem->source_file);
+			$pastAnswer->comment_string($comment);
 
 			$db->addPastAnswer($pastAnswer);
 

@@ -96,10 +96,15 @@ sub can_showCorrectAnswers {
 #    any individual problem.  to deal with this, we make 
 #    can_showCorrectAnswers give the least restrictive view of hiding, and 
 #    then filter scores for the problems themselves later
-	my $canShowScores = ( $Set->hide_score eq 'N' ||
-			      $Set->hide_score_by_problem eq 'Y' ||
-			      ( $Set->hide_score eq 'BeforeAnswerDate' &&
-				after($tmplSet->answer_date) ) );
+
+#    showing correcrt answers but not showing scores doesn't make sense
+#    so we should hide the correct answers if we aren not showing
+#    scores GG.
+
+	my $canShowScores = $Set->hide_score_by_problem eq 'N' &&
+	  ( $Set->hide_score eq 'N' ||
+	    ( $Set->hide_score eq 'BeforeAnswerDate' &&
+	      after($tmplSet->answer_date) ) );
 
 	return ( ( ( after( $Set->answer_date ) || 
 		     ( $attemptsUsed >= $maxAttempts && 
@@ -138,10 +143,14 @@ sub can_showSolutions {
 #    any individual problem.  to deal with this, we make can_showSolutions 
 #    give the least restrictive view of hiding, and then filter scores for 
 #    the problems themselves later
-	my $canShowScores = ( $Set->hide_score eq 'N' ||
-			      $Set->hide_score_by_problem eq 'Y' ||
-			      ( $Set->hide_score eq 'BeforeAnswerDate' &&
-				after($tmplSet->answer_date) ) );
+#    showing correcrt answers but not showing scores doesn't make sense
+#    so we should hide the correct answers if we aren not showing
+#    scores GG.
+
+	my $canShowScores = $Set->hide_score_by_problem eq 'N' &&
+	  ( $Set->hide_score eq 'N' ||
+	    ( $Set->hide_score eq 'BeforeAnswerDate' &&
+	      after($tmplSet->answer_date) ) );
 
 	return ( ( ( after( $Set->answer_date ) || 
 		     ( $attemptsUsed >= $attempts_per_version &&
@@ -250,10 +259,14 @@ sub can_checkAnswers {
 	#    be shown, but not show the score on any individual problem.  
 	#    to deal with this, we use the least restrictive view of hiding 
 	#    here, and then filter for the problems themselves later
-	my $canShowScores = ( $Set->hide_score eq 'N' ||
-			      $Set->hide_score_by_problem eq 'Y' ||
-			      ( $Set->hide_score eq 'BeforeAnswerDate' &&
-				after($tmplSet->answer_date) ) );
+	#    showing correcrt answers but not showing scores doesn't make sense
+	#    so we should hide the correct answers if we aren not showing
+	#    scores GG.
+
+	my $canShowScores = $Set->hide_score_by_problem eq 'N' &&
+	  ( $Set->hide_score eq 'N' ||
+	    ( $Set->hide_score eq 'BeforeAnswerDate' &&
+	      after($tmplSet->answer_date) ) );
 
 	if (before($Set->open_date, $submitTime)) {
 		return $authz->hasPermissions($User->user_id, "check_answers_before_open_date");
@@ -296,7 +309,6 @@ sub can_showScore {
 
 	# address hiding scores by problem
 	my $canShowScores = ( $Set->hide_score eq 'N' ||
-			      $Set->hide_score_by_problem eq 'Y' ||
 			      ( $Set->hide_score eq 'BeforeAnswerDate' &&
 				after($tmplSet->answer_date) ) );
 
@@ -1708,8 +1720,9 @@ sub body {
 
 	# some convenient output variables
 	my $canShowProblemScores = $can{showScore} && 
-	    ($set->hide_score eq 'N' || $set->hide_score_by_problem eq 'N' ||
+	    ($set->hide_score_by_problem eq 'N' ||
 	     $authz->hasPermissions($user, "view_hidden_work"));
+
 	my $canShowWork = $authz->hasPermissions($user, "view_hidden_work") || ($set->hide_work eq 'N' || ($set->hide_work eq 'BeforeAnswerDate' && $timeNow>$tmplSet->answer_date));
 
 	# for nicer answer checking on multi-page tests, we want to keep 
@@ -2133,7 +2146,7 @@ sub body {
 				my $curr_prefix = 'Q' . sprintf("%04d", $probOrder[$i]+1) . '_';
 				my @curr_fields = grep /^$curr_prefix/, keys %{$self->{formFields}};
 				foreach my $curr_field ( @curr_fields ) {
- 					foreach ( split(/\0/, $self->{formFields}->{$curr_field}) ) {
+ 					foreach ( split(/\0/, $self->{formFields}->{$curr_field} // '') ) {
  						print CGI::hidden({-name=>$curr_field, 
  							   	   -value=>$_});
  					}
@@ -2216,6 +2229,15 @@ sub body {
 			CGI::end_form();
 	}
 
+	# prints the achievement message if there is one
+	#If achievements enabled, and if we are not in a try it page, check to see if there are new ones.and print them.  
+	#Gateways are special.  We only provide the first problem just to seed the data, but all of the problems from the gateway will be provided to the achievement evaluator
+	if ($ce->{achievementsEnabled} && $will{recordAnswers} 
+	    && $submitAnswers && $set->set_id ne 'Undefined_Set') {
+	    print  WeBWorK::AchievementEvaluator::checkForAchievements($problems[0], $pg_results[0], $db, $ce, setVersion=>$versionNumber);
+	    
+	}
+	
 	return "";
 
 }
@@ -2344,6 +2366,10 @@ sub output_JS{
 	print CGI::start_script({type=>"text/javascript", src=>"$site_url/js/apps/GatewayQuiz/gateway.js"}), CGI::end_script();
 	
 	return "";
+}
+
+sub output_achievement_CSS {
+    return "";
 }
 
 1;

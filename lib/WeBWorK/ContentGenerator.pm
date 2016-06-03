@@ -169,7 +169,9 @@ sub go {
 	# If grades are begin passed back to the lti then we peroidically
 	# update all of the grades because things can get out of sync if
 	# instructors add or modify sets.
-	if ($ce->{LTIGradeMode}) {
+	if (defined($r) && 
+            defined($r->{db}) &&
+            $ce->{LTIGradeMode}) {
 
 	  my $grader = WeBWorK::Authen::LTIAdvanced::SubmitGrade->new($r);
 	  

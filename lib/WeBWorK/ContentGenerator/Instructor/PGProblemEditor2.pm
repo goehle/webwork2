@@ -1777,7 +1777,7 @@ sub save_as_form {  # calls the save_as_handler
 }
 # suggestions for improvement
 # save as ......
-# ¥replacing foobar (rename) ¥ and add to set (add_new_problem) ¥ as an independent file (new_independent_problem)
+# replacing foobar (rename)  and add to set (add_new_problem)  as an independent file (new_independent_problem)
  
 sub save_as_handler {
 	my ($self, $genericParams, $actionParams, $tableParams) = @_;

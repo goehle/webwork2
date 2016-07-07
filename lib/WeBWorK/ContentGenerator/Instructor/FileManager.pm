@@ -38,6 +38,7 @@ use WeBWorK::CGI;
 use WeBWorK::Utils::CourseManagement qw(archiveCourse);
 
 use constant HOME => 'templates';
+use constant DEFAULT_SEED => 123456;
 
 #
 #  The list of file extensions and the directories they usually go in.
@@ -67,6 +68,7 @@ sub pre_header_initialize {
 	
 	my $action = $r->param('action');
 	$self->Download if ($action && ($action eq 'Download' || $action eq $r->maketext("Download")));
+	$self->PGEdit if($action && ($action eq "PG Edit" || $action eq $r->maketext("PG Edit")));
 	my $file = $r->param('download');
 	$self->downloadFile($file) if (defined $file);
 	my $ce = $r->ce;
@@ -154,7 +156,7 @@ sub body {
 	elsif($action eq "Directory"|| $action eq $r->maketext("Directory")) {$self->Go;} 
 	elsif($action eq "Go" 		|| $action eq $r->maketext("Go")) {$self->Go;} 
 	elsif($action eq "View" 	|| $action eq $r->maketext("View")) {$self->View;} 
-	elsif($action eq "Edit" 	|| $action eq $r->maketext("Edit")) {$self->Edit;} 
+	elsif($action eq "Edit" 	|| $action eq $r->maketext("Edit")) {$self->Edit;}
 	elsif($action eq "Download" 	|| $action eq $r->maketext("Download")) {$self->Refresh;} 
 	elsif($action eq "Copy" 	|| $action eq $r->maketext("Copy")) {$self->Copy;} 
 	elsif($action eq "Rename" 	|| $action eq $r->maketext("Rename")) {$self->Rename;} 
@@ -268,6 +270,7 @@ sub Refresh {
 			var state = files.selectedIndex < 0;
 			disableButton('View',state);
 			disableButton('Edit',state);
+			disableButton('PGEdit',state);
 			disableButton('Download',state);
 			disableButton('Rename',state);
 			disableButton('Copy',state);
@@ -347,6 +350,7 @@ EOF
 			CGI::Tr([
 				CGI::td(CGI::input({%button,value=>$r->maketext("View"),id=>"View"})),
 				CGI::td(CGI::input({%button,value=>$r->maketext("Edit"),id=>"Edit"})),
+				CGI::td(CGI::input({%button,value=>$r->maketext("PG Edit"),id=>"PGEdit"})),
 				CGI::td(CGI::input({%button,value=>$r->maketext("Download"),id=>"Download"})),
 				CGI::td(CGI::input({%button,value=>$r->maketext("Rename"),id=>"Rename"})),
 				CGI::td(CGI::input({%button,value=>$r->maketext("Copy"),id=>"Copy"})),
@@ -515,6 +519,41 @@ sub Edit {
 	}
 
 	$self->RefreshEdit($data,$filename);
+}
+
+
+##################################################
+#
+#  Open File in PG Editor
+#
+sub PGEdit {
+	my $self = shift;
+	my $filename = $self->getFile('PG edit'); return unless $filename;
+	my $file = "$self->{courseRoot}/$self->{pwd}/$filename";
+	my $r = $self->r;
+	my $userID = $r->param('user');
+	my $ce = $r->ce;
+	my $authz = $r->authz;
+	my $courseName = $r->urlpath->arg("courseID");
+
+	my $problemPage =
+	  $self->r->urlpath->newFromModule(
+					   "WeBWorK::ContentGenerator::Instructor::PGProblemEditor2",$r,
+					   courseID => $courseName, setID => 'Undefined_Set', problemID => 1
+					  );
+	my $new_file_type = 'source_path_for_problem_file';
+
+	my $templatesDir = $self->r->ce->{courseDirs}->{templates};
+	$file =~ s|^$templatesDir/*||; # remove templates path and any slashes that follow
+
+	my $viewURL = $self->systemLink($problemPage, 
+					params=>{
+						 sourceFilePath     => $file, #The path relative to the templates directory is required.
+						 file_type          => $new_file_type
+						}
+				       );
+	
+	$self->reply_with_redirect($viewURL);
 }
 
 ##################################################
@@ -985,25 +1024,28 @@ sub getFile {
 	my $self = shift; my $action = shift;
 	my $r = $self->r;
 	my @files = $self->r->param("files");
+
+	my $skipRefresh = $action eq 'download' || $action eq $r->maketext('download') || $action eq 'PG edit' || $action eq $r->maketext('PG edit');
+	
 	if (scalar(@files) > 1) {
 		$self->addbadmessage($r->maketext("You can only [_1] one file at a time.",$action));
-		$self->Refresh unless ($action eq 'Download' || $action eq $r->maketext('Download'));
+		$self->Refresh unless $skipRefresh;
 		return;
 	}
 	if (scalar(@files) == 0 || $files[0] eq "") {
 		$self->addbadmessage($r->maketext("You need to select a file to [_1].",$action));
-		$self->Refresh unless ($action eq 'Download' || $action eq $r->maketext('Download'));
+		$self->Refresh unless $skipRefresh;
 		return;
 	}
 	my $pwd = $self->checkPWD($self->{pwd} || $self->r->param('pwd') || HOME) || '.';
 	if ($self->isSymLink($pwd.'/'.$files[0])) {
 		$self->addbadmessage($r->maketext("That symbolic link takes you outside your course directory"));
-		$self->Refresh unless ($action eq 'Download' || $action eq $r->maketext('Download'));
+		$self->Refresh unless $skipRefresh;
 		return;
 	}
 	unless ($self->checkPWD($pwd.'/'.$files[0],1)) {
 		$self->addbadmessage($r->maketext("You have specified an illegal file"));
-		$self->Refresh unless ($action eq 'Download' || $action eq $r->maketext('Download'));
+		$self->Refresh unless $skipRefresh;
 		return;
 	}
 	return $files[0];

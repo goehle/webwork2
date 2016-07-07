@@ -36,6 +36,7 @@ use HTML::Entities;
 use URI::Escape;
 use WeBWorK::Utils qw(has_aux_files not_blank);
 use File::Copy;
+use File::Basename qw(dirname);
 use WeBWorK::Utils::Tasks qw(fake_user fake_set renderProblems);
 use Data::Dumper;
 use Fcntl;
@@ -1710,13 +1711,12 @@ sub save_as_form {  # calls the save_as_handler
 	my $templatesDir  =  $self->r->ce->{courseDirs}->{templates};
 	my $setID         = $self->{setID};
 	my $fullSetID     = $self->{fullSetID};
-	
-	
+		
+	my $fileDir = dirname($editFilePath);
 	my $shortFilePath =  $editFilePath;
 	$shortFilePath   =~ s|^$templatesDir/||;
 	$shortFilePath   =  'local/'.$shortFilePath
-	  if (! -W $editFilePath );  # suggest that modifications be saved to the "local" subdirectory if its not a writable file
-
+	  if (! -w $fileDir );  # suggest that modifications be saved to the "local" subdirectory if its not in a writeable directory
 	$shortFilePath =~ s|^.*/|| if $shortFilePath =~ m|^/|;  # if it is still an absolute path don't suggest a file path to save to.
    
 

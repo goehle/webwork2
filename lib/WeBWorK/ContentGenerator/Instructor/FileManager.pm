@@ -527,10 +527,17 @@ sub Edit {
 #  Open File in PG Editor
 #
 sub PGEdit {
-	my $self = shift;
-	my $filename = $self->getFile('PG edit'); return unless $filename;
-	my $file = "$self->{courseRoot}/$self->{pwd}/$filename";
+        my $self = shift;
 	my $r = $self->r;
+	my $filename = $self->getFile('PG edit'); return unless $filename;
+	my $pwd = $self->checkPWD(shift || $self->r->param('pwd') || HOME);
+	return unless $pwd;
+	$pwd = $self->{ce}{courseDirs}{root} . '/' . $pwd;
+	my $file = "$pwd/$filename";
+	unless (-e $file) {
+		$self->addbadmessage($r->maketext("The file you are trying to download doesn't exist"));
+		return;
+	}
 	my $userID = $r->param('user');
 	my $ce = $r->ce;
 	my $authz = $r->authz;

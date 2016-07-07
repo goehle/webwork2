@@ -656,6 +656,7 @@ sub pre_header_initialize {
 	if ($prEnabled){
 		my $thisAttempt = ($submitAnswers) ? 1 : 0;
 		my $attempts_used = $problem->num_correct + $problem->num_incorrect + $thisAttempt;
+		$problem->{prCount} = 0 unless defined $problem->{prCount};
 		if ($problem->{prCount} =~ /^\s*$/) {
 			$problem->{prCount} = sprintf("%d",$attempts_used/$rerandomizePeriod) - 1;
 		}

@@ -1715,8 +1715,7 @@ sub save_as_form {  # calls the save_as_handler
 	my $shortFilePath =  $editFilePath;
 	$shortFilePath   =~ s|^$templatesDir/||;
 	$shortFilePath   =  'local/'.$shortFilePath
-	  unless( $shortFilePath =~m|^local/| ||
-		  (defined $setID and $shortFilePath =~m|^set$setID|));  # suggest that modifications be saved to the "local" subdirectory
+	  if ( $shortFilePath =~m|^Library/| );  # suggest that modifications be saved to the "local" subdirectory if its a library file
 	$shortFilePath =~ s|^.*/|| if $shortFilePath =~ m|^/|;  # if it is still an absolute path don't suggest a file path to save to.
    
 

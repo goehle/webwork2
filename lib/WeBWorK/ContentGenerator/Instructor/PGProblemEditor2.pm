@@ -2011,7 +2011,6 @@ sub output_JS{
 	    print CGI::start_script({type=>"text/javascript", src=>"$site_url/js/apps/MathView/mathview.js"}), CGI::end_script();
 	  }
 
-
 	if ($ce->{options}->{PGCodeMirror}) {
 	  
 	  print CGI::start_script({type=>"text/javascript", src=>"$site_url/js/vendor/codemirror/codemirror.js"}), CGI::end_script();

@@ -763,29 +763,6 @@ sub getRelativeSourceFilePath {
 	return $sourceFilePath;
 }
 
-# determineLocalFilePath   constructs a local file path parallel to a library file path
-
-# 
-sub determineLocalFilePath {
-	my $self= shift;				die "determineLocalFilePath is a method" unless ref($self);
-	my $path = shift;
- 	my $default_screen_header_path   = $self->r->ce->{webworkFiles}->{hardcopySnippets}->{setHeader}; 
- 	my $default_hardcopy_header_path = $self->r->ce->{webworkFiles}->{screenSnippets}->{setHeader};
-	my $setID = $self->{setID};
-	$setID = int(rand(1000)) unless $setID =~/\S/;  # setID can be 0
-	if ($path =~ /Library/) {
-		#$path =~ s|^.*?Library/||;  # truncate the url up to a segment such as ...rochesterLibrary/.......
-		$path  =~ s|^.*?Library/|local/|;  # truncate the url up to a segment such as ...rochesterLibrary/....... and prepend local
- 	} elsif ($path eq $default_screen_header_path) {
- 		$path = "set$setID/setHeader.pg";
- 	} elsif ($path eq $default_hardcopy_header_path) {
- 		$path = "set$setID/hardcopyHeader.tex";
-	} else { # if its not in a library we'll just save it locally
-		$path = "new_problem_".int(rand(1000)).".pg";	#l hope there aren't any collisions.
-	}
-    $path;
-
-}
 
 sub determineTempEditFilePath {  # this does not create the directories in the path to the file
                                  # it  returns an absolute path to the file
@@ -1711,8 +1688,8 @@ sub save_as_form {  # calls the save_as_handler
 	my $templatesDir  =  $self->r->ce->{courseDirs}->{templates};
 	my $setID         = $self->{setID};
 	my $fullSetID     = $self->{fullSetID};
-		
-	my $fileDir = dirname($editFilePath);
+
+	my $fileDir = dirname($editFilePath);	
 	my $shortFilePath =  $editFilePath;
 	$shortFilePath   =~ s|^$templatesDir/||;
 	$shortFilePath   =  'local/'.$shortFilePath
@@ -2015,6 +1992,7 @@ sub output_JS{
 	  
 	  print CGI::start_script({type=>"text/javascript", src=>"$site_url/js/vendor/codemirror/codemirror.js"}), CGI::end_script();
 	  print CGI::start_script({type=>"text/javascript", src=>"$site_url/js/vendor/codemirror/PG.js"}), CGI::end_script();
+	  print CGI::start_script({type=>"text/javascript", src=>"$site_url/js/vendor/codemirror/PGaddons.js"}), CGI::end_script();
 	  print "<link rel=\"stylesheet\" type=\"text/css\" href=\"$site_url/js/vendor/codemirror/codemirror.css\"/>";
 
 	}

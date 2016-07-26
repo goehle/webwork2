@@ -2067,6 +2067,7 @@ sub output_JS{
 	if ($ce->{options}->{PGCodeMirror}) {
 	  
 	  print CGI::start_script({type=>"text/javascript", src=>"$site_url/js/vendor/codemirror/codemirror.js"}), CGI::end_script();
+	  print CGI::start_script({type=>"text/javascript", src=>"$site_url/js/vendor/codemirror/PGaddons.js"}), CGI::end_script();
 	  print CGI::start_script({type=>"text/javascript", src=>"$site_url/js/vendor/codemirror/PG.js"}), CGI::end_script();
 	  print "<link rel=\"stylesheet\" type=\"text/css\" href=\"$site_url/js/vendor/codemirror/codemirror.css\"/>";
 

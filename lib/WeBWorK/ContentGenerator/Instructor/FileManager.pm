@@ -17,6 +17,7 @@
 package WeBWorK::ContentGenerator::Instructor::FileManager;
 use base qw(WeBWorK::ContentGenerator::Instructor);
 
+use utf8;
 use WeBWorK::Utils qw(readDirectory readFile sortByName listFilesRecursive);
 use WeBWorK::Upload;
 use File::Path;
@@ -1323,7 +1324,8 @@ sub showHTML {
 #
 sub isText {
 	my $string = shift;
-	return $string !~ m/[^\s\x20-\x7E]{4}/;
+	#	return $string !~ m/[^\s\x20-\x7E]{4}/;
+	return utf8::valid($string);
 }
 
 ##################################################

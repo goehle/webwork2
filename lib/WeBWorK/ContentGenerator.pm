@@ -165,11 +165,17 @@ sub go {
 	my ($self) = @_;
 	my $r = $self->r;
 	my $ce = $r->ce;
-
+	my $urlpath = $r->urlpath;
+	
 	# If grades are begin passed back to the lti then we peroidically
 	# update all of the grades because things can get out of sync if
 	# instructors add or modify sets.
-	if ($ce->{LTIGradeMode}) {
+
+	# We should also check to make sure that we are visiting a course
+	# and that it is not the admin course
+	if ($ce->{LTIGradeMode}
+	    && $urlpath->arg("courseID")
+	    && $urlpath->arg("courseID") ne 'admin') {
 
 	  my $grader = WeBWorK::Authen::LTIAdvanced::SubmitGrade->new($r);
 	  
